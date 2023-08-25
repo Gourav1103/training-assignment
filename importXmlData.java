@@ -549,240 +549,258 @@ public class importXmlData {
 
     //Process Product DigitalFileInformation
     private static void processProductDigitalInformation(XMLStreamReader reader,String partsNumber) throws XMLStreamException {
-        String maintenanceType = reader.getAttributeValue(null, "MaintenanceType");
-        String languageCode = reader.getAttributeValue(null,"LanguageCode");
-        String assetType = "";
-        String fileName = "";
-        String resolution = "";
-        String fileSize = "";
-        String fileType = "";
-        String assetId = "";
-        String assetDimensionsUom = "";
-        String assetHeight = "";
-        String assetWidth = "";
-        String filePath = "";
-        String colorMode = "";
-        String background = "";
-        String representation = "";
-        String URI = "";
-        while(reader.hasNext()){
-            int event = reader.next();
-            if(event == XMLStreamConstants.START_ELEMENT){
-                String elementName = reader.getLocalName();
-                switch(elementName){
-                    case "AssetType":
-                        assetType = reader.getElementText();
-                        break;
-                    case "FileName":
-                        fileName = reader.getElementText();
-                        break;
-                    case "Resolution":
-                        resolution = reader.getElementText();
-                        break;
-                    case "FileType":
-                        fileType = reader.getElementText();
-                        break;
-                    case "AssetID":
-                        assetId = reader.getElementText();
-                        break;
-                    case "FileSize":
-                        fileSize = reader.getElementText();
-                        break;
-                    case "FilePath":
-                        filePath = reader.getElementText();
-                        break;
-                    case "URI":
-                        URI = reader.getElementText();
-                        break;
-                    case "Representation":
-                        representation = reader.getElementText();
-                        break;
-                    case "ColorMode":
-                        colorMode = reader.getElementText();
-                        break;
-                    case "Background":
-                        background = reader.getElementText();
-                        break;
-                    case "AssetDimensions":
-                        assetDimensionsUom = reader.getAttributeValue(null, "UOM");
-                        while(reader.hasNext()){
-                            int assetEvent = reader.next();
-                            if(assetEvent == XMLStreamConstants.START_ELEMENT){
-                                String assetElementName = reader.getLocalName();
-                                switch(assetElementName){
-                                    case "AssetHeight":
-                                        assetHeight = reader.getElementText();
-                                        break;
-                                    case "AssetWidth":
-                                        assetWidth = reader.getElementText();
-                                        break;
+        try {
+            String maintenanceType = reader.getAttributeValue(null, "MaintenanceType");
+            String languageCode = reader.getAttributeValue(null, "LanguageCode");
+            String assetType = "";
+            String fileName = "";
+            String resolution = "";
+            String fileSize = "";
+            String fileType = "";
+            String assetId = "";
+            String assetDimensionsUom = "";
+            String assetHeight = "";
+            String assetWidth = "";
+            String filePath = "";
+            String colorMode = "";
+            String background = "";
+            String representation = "";
+            String URI = "";
+            while (reader.hasNext()) {
+                int event = reader.next();
+                if (event == XMLStreamConstants.START_ELEMENT) {
+                    String elementName = reader.getLocalName();
+                    switch (elementName) {
+                        case "AssetType":
+                            assetType = reader.getElementText();
+                            break;
+                        case "FileName":
+                            fileName = reader.getElementText();
+                            break;
+                        case "Resolution":
+                            resolution = reader.getElementText();
+                            break;
+                        case "FileType":
+                            fileType = reader.getElementText();
+                            break;
+                        case "AssetID":
+                            assetId = reader.getElementText();
+                            break;
+                        case "FileSize":
+                            fileSize = reader.getElementText();
+                            break;
+                        case "FilePath":
+                            filePath = reader.getElementText();
+                            break;
+                        case "URI":
+                            URI = reader.getElementText();
+                            break;
+                        case "Representation":
+                            representation = reader.getElementText();
+                            break;
+                        case "ColorMode":
+                            colorMode = reader.getElementText();
+                            break;
+                        case "Background":
+                            background = reader.getElementText();
+                            break;
+                        case "AssetDimensions":
+                            assetDimensionsUom = reader.getAttributeValue(null, "UOM");
+                            while (reader.hasNext()) {
+                                int assetEvent = reader.next();
+                                if (assetEvent == XMLStreamConstants.START_ELEMENT) {
+                                    String assetElementName = reader.getLocalName();
+                                    switch (assetElementName) {
+                                        case "AssetHeight":
+                                            assetHeight = reader.getElementText();
+                                            break;
+                                        case "AssetWidth":
+                                            assetWidth = reader.getElementText();
+                                            break;
+                                    }
+                                } else if (assetEvent == XMLStreamConstants.END_ELEMENT
+                                        && reader.getLocalName().equals("AssetDimensions")) {
+                                    break;
                                 }
-                            } else if(assetEvent == XMLStreamConstants.END_ELEMENT && reader.getLocalName().equals("AssetDimensions")){
-                                break;
                             }
-                        }
-                        break;
+                            break;
 
+                    }
+                } else if (event == XMLStreamConstants.END_ELEMENT
+                        && reader.getLocalName().equals("DigitalFileInformation")) {
+                    break;
                 }
-            } else if(event == XMLStreamConstants.END_ELEMENT && reader.getLocalName().equals("DigitalFileInformation")){
-                break;
             }
-        }
-        Map<String,Object> dataResourceData = new HashMap<>();
-        Map<String,Object> contentData = new HashMap<>();
-        try{
-            if (!filePath.equals("")) {
-                dataResourceData.put("dataResourceName", filePath);
-            }
+            Map<String, Object> dataResourceData = new HashMap<>();
+            Map<String, Object> contentData = new HashMap<>();
+            String contentType = "";
+            boolean digitalAssetIsPresent = false;
 
-            if (!URI.equals("")) {
-                dataResourceData.put("objectInfo", URI);
-            }
-
-            if (!fileType.equals("JPG")) {
-                dataResourceData.put("mimeTypeId", "image/jpeg");
-            } else if (!fileType.equals("MP4")) {
-                dataResourceData.put("mimeTypeId", "video/mp4");
+            //check the file type for Product Content type
+            if (fileType.equals("JPG")) {
+                contentType = "DETAIL_IMAGE_URL";
             } else {
-                dataResourceData.put("mimeTypeId", "application/pdf");
+                contentType = "DIGITAL_DOWNLOAD";
             }
 
-            dataResourceData.put("userLogin", userLogin);
+            //Entity condition for find the contentId's associate with product
+            EntityCondition condition = EntityCondition.makeCondition(
+                    EntityOperator.AND,
+                    EntityCondition.makeCondition("productId", partsNumber),
+                    EntityCondition.makeCondition("productContentTypeId", contentType));
 
-            //check Assets Id is present or not
-            if(!assetId.equals("")) {
-                GenericValue content = EntityQuery.use(delegator).from("Content").where("contentId", assetId).cache().queryOne();
-                // if content is not present then create the new assets content
-                if(content == null) {
-                    Map<String, Object> dataResource = dispatcher.runSync("createDataResource", dataResourceData);
-                    Object dataResourceId = dataResource.get("dataResourceId");
+            // fetch all the productContent using productId and productContentTypeId
+            List<GenericValue> productContents = EntityQuery.use(delegator).from("ProductContent").where(condition)
+                    .cache().queryList();
 
-                    //check the assets resolution is present or not
-                    if (!resolution.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Resolution", "attrValue", resolution, "userLogin", userLogin));
+            //Search the contentId using fileName
+            for (GenericValue productContent : productContents) {
+                Object contentId = productContent.get("contentId");
+                GenericValue content = EntityQuery.use(delegator).from("Content")
+                        .where("contentId", contentId, "contentName", fileName).cache().queryOne();
+
+                //update the digital File Information
+                if (content != null) {
+                    Object dataResourceId = content.get("dataResourceId");
+                    if (URI.equals("")) {
+                        dispatcher.runSync("updateDataResource", UtilMisc.toMap("dataResourceId", dataResourceId,
+                                "objectInfo", URI, "userLogin", userLogin));
                     }
 
-                    //check the assets colorMode is present or not
+                    // check the assets resolution is present or not
+                    if (!resolution.equals("")) {
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Resolution", "attrValue",
+                                        resolution, "userLogin", userLogin));
+                    }
+
+                    // check the assets colorMode is present or not
                     if (!colorMode.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "ColorMode", "attrValue", colorMode, "userLogin", userLogin));
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "ColorMode", "attrValue",
+                                        colorMode, "userLogin", userLogin));
                     }
 
                     if (!representation.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Representation", "attrValue", representation, "userLogin", userLogin));
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Representation",
+                                        "attrValue", representation, "userLogin", userLogin));
                     }
 
                     if (!background.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Background", "attrValue", background, "userLogin", userLogin));
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Background", "attrValue",
+                                        background, "userLogin", userLogin));
                     }
                     if (!fileSize.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "FileSize", "attrValue", fileSize, "userLogin", userLogin));
+                        dispatcher.runSync("updateDataResourceAttribute", UtilMisc.toMap("dataResourceId",
+                                dataResourceId, "attrName", "FileSize", "attrValue", fileSize, "userLogin", userLogin));
                     }
 
                     if (!assetHeight.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetHeight", "attrValue", assetHeight, "description", assetDimensionsUom, "userLogin", userLogin));
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetHeight", "attrValue",
+                                        assetHeight, "description", assetDimensionsUom, "userLogin", userLogin));
                     }
 
                     if (!assetWidth.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetWidth", "attrValue", assetWidth, "description", assetDimensionsUom, "userLogin", userLogin));
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetWidth", "attrValue",
+                                        assetWidth, "description", assetDimensionsUom, "userLogin", userLogin));
                     }
 
-                    if (!assetId.equals("")) {
-                        contentData.put("contentId", assetId);
-                    }
-
-                    if (!fileName.equals("")) {
-                        contentData.put("contentName", fileName);
-                    }
-                    if (languageCode != null && !languageCode.isEmpty()) {
-                        contentData.put("localeString", languageCode);
-                    }
-                    if (!assetType.equals("")) {
-                        contentData.put("description", assetType);
-                    }
-                    contentData.put("dataResourceId", dataResourceId);
-                    contentData.put("userLogin", userLogin);
-
-                    Map<String, Object> contentResult = dispatcher.runSync("createContent", contentData);
-                    Object contentId = contentResult.get("contentId");
-
-                    //Create the ProductContent using partNumber and ContentId
-                    if (!partsNumber.equals("")) {
-                        if (fileType.equals("JPG")) {
-                            dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId", contentId, "productContentTypeId", "DETAIL_IMAGE_URL", "userLogin", userLogin));
-                        } else {
-                            dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId", contentId, "productContentTypeId", "DIGITAL_DOWNLOAD", "userLogin", userLogin));
-                        }
-                    }
-                }else {
-                    //Update Content
-                    Object dataResourceID = content.get("dataResourceId");
-                    dataResourceData.put("dataResourceId",dataResourceID);
-                    dispatcher.runSync("updateDataResource", dataResourceData);
-                    if (!resolution.equals("")) {
-                        dispatcher.runSync("updateDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceID, "attrName", "Resolution", "attrValue", resolution, "userLogin", userLogin));
-                    }
-                    if (!fileSize.equals("")) {
-                        dispatcher.runSync("updateDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceID, "attrName", "FileSize", "attrValue", fileSize, "userLogin", userLogin));
-                    }
-                    if (!assetHeight.equals("")) {
-                        dispatcher.runSync("updateDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceID, "attrName", "AssetHeight", "attrValue", assetHeight, "description", assetDimensionsUom, "userLogin", userLogin));
-                    }
-                    if (!assetWidth.equals("")) {
-                        dispatcher.runSync("updateDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceID, "attrName", "AssetWidth", "attrValue", assetWidth, "description", assetDimensionsUom, "userLogin", userLogin));
-                    }
-                    if (!fileName.equals("")) {
-                        contentData.put("contentName", fileName);
-                    }
-                    if (!assetType.equals("")) {
-                        contentData.put("description", assetType);
-                    }
-                    contentData.put("dataResourceId", dataResourceID);
-                    contentData.put("userLogin", userLogin);
-                    contentData.put("contentId",assetId);
-                    dispatcher.runSync("updateContent", contentData);
+                    digitalAssetIsPresent = true;
+                    break;
                 }
             }
-            else{
-                //If assetId is not present
+
+            //create the digital file information
+            if (!digitalAssetIsPresent) {
+                if (!URI.equals("")) {
+                    dataResourceData.put("objectInfo", URI);
+                }
+
+                if (!fileType.equals("JPG")) {
+                    dataResourceData.put("mimeTypeId", "image/jpeg");
+                } else if (!fileType.equals("MP4")) {
+                    dataResourceData.put("mimeTypeId", "video/mp4");
+                } else {
+                    dataResourceData.put("mimeTypeId", "application/pdf");
+                }
+
+                dataResourceData.put("userLogin", userLogin);
+
                 Map<String, Object> dataResource = dispatcher.runSync("createDataResource", dataResourceData);
                 Object dataResourceId = dataResource.get("dataResourceId");
+
+                // check the assets resolution is present or not
+                if (!resolution.equals("")) {
+                    dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId,
+                            "attrName", "Resolution", "attrValue", resolution, "userLogin", userLogin));
+                }
+
+                // check the assets colorMode is present or not
                 if (!colorMode.equals("")) {
-                    dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "ColorMode", "attrValue", colorMode, "userLogin", userLogin));
+                    dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId,
+                            "attrName", "ColorMode", "attrValue", colorMode, "userLogin", userLogin));
                 }
+
                 if (!representation.equals("")) {
-                    dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Representation", "attrValue", representation, "userLogin", userLogin));
+                    dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId,
+                            "attrName", "Representation", "attrValue", representation, "userLogin", userLogin));
                 }
+
                 if (!background.equals("")) {
-                    dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Background", "attrValue", background, "userLogin", userLogin));
+                    dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId,
+                            "attrName", "Background", "attrValue", background, "userLogin", userLogin));
                 }
+                if (!fileSize.equals("")) {
+                    dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId,
+                            "attrName", "FileSize", "attrValue", fileSize, "userLogin", userLogin));
+                }
+
                 if (!assetHeight.equals("")) {
-                    dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetHeight", "attrValue", assetHeight, "description", assetDimensionsUom, "userLogin", userLogin));
+                    dispatcher.runSync("createDataResourceAttribute",
+                            UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetHeight", "attrValue",
+                                    assetHeight, "description", assetDimensionsUom, "userLogin", userLogin));
                 }
+
                 if (!assetWidth.equals("")) {
-                    dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetWidth", "attrValue", assetWidth, "description", assetDimensionsUom, "userLogin", userLogin));
+                    dispatcher.runSync("createDataResourceAttribute",
+                            UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetWidth", "attrValue",
+                                    assetWidth, "description", assetDimensionsUom, "userLogin", userLogin));
                 }
-                if (!fileName.equals("")) {
-                    contentData.put("contentName", fileName);
-                }
+
                 if (languageCode != null && !languageCode.isEmpty()) {
                     contentData.put("localeString", languageCode);
                 }
                 if (!assetType.equals("")) {
                     contentData.put("description", assetType);
                 }
+                if (!fileName.equals("")) {
+                    contentData.put("contentName", fileName);
+                }
+
                 contentData.put("dataResourceId", dataResourceId);
                 contentData.put("userLogin", userLogin);
+
                 Map<String, Object> contentResult = dispatcher.runSync("createContent", contentData);
                 Object contentId = contentResult.get("contentId");
+
+                // Create the ProductContent using partNumber and ContentId
                 if (!partsNumber.equals("")) {
                     if (fileType.equals("JPG")) {
-                        dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId", contentId, "productContentTypeId", "DETAIL_IMAGE_URL", "userLogin", userLogin));
+                        dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId",
+                                contentId, "productContentTypeId", "DETAIL_IMAGE_URL", "userLogin", userLogin));
                     } else {
-                        dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId", contentId, "productContentTypeId", "DIGITAL_DOWNLOAD", "userLogin", userLogin));
+                        dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId",
+                                contentId, "productContentTypeId", "DIGITAL_DOWNLOAD", "userLogin", userLogin));
                     }
                 }
             }
-        }catch(Exception exception){
+        } catch (XMLStreamException exception) {
+            System.out.println(exception);
+        } catch (Exception exception) {
             System.out.println(exception);
         }
     }
