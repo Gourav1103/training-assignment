@@ -277,20 +277,55 @@ public class importXmlData {
             String languageCode = reader.getAttributeValue(null, "LanguageCode");
             String maintenanceType = reader.getAttributeValue(null, "MaintenanceType");
             String descriptionText = reader.getElementText();
-            GenericValue content = EntityQuery.use(delegator).from("Content").where("contentName",descriptionCode,"description",descriptionText).cache().queryFirst();
-            String contentId = content.getString("contentId");
-            if (content == null) {
-                Map<String,Object> contentData = dispatcher.runSync("createContent", UtilMisc.<String, Object>toMap("contentName", descriptionCode, "localeString", languageCode,"description",descriptionText, "userLogin", userLogin,"statusId","CTNT_AVAILABLE"));
-                if(!partsNumber.equals("")) {
-                    dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId",contentData.get("contentId") , "productContentTypeId", "DESCRIPTION","userLogin",userLogin));
+            boolean descriptionIsPresent = false;
+
+            //Entity condition for find the contentId's associate with product
+            EntityCondition condition = EntityCondition.makeCondition(
+                    EntityOperator.AND,
+                    EntityCondition.makeCondition("productId", partsNumber),
+                    EntityCondition.makeCondition("productContentTypeId", "LONG_DESCRIPTION"));
+
+            // fetch all the productContent using productId and productContentTypeId
+            List<GenericValue> productContents = EntityQuery.use(delegator).from("ProductContent").where(condition)
+                    .cache().queryList();
+
+            //Search the contentId using descriptionCode
+            for (GenericValue productContent : productContents) {
+                Object contentId = productContent.get("contentId");
+                GenericValue descriptionContent = EntityQuery.use(delegator).from("Content")
+                        .where("contentId", contentId, "contentName", descriptionCode).cache().queryOne();
+
+                //update decription
+                if (descriptionContent != null) {
+                    Object dataResourceId = descriptionContent.get("dataResourceId");
+                    dispatcher.runSync("updateElectronicText", UtilMisc.toMap("dataResourceId", dataResourceId,
+                            "textData", descriptionText, "userLogin", userLogin));
+                    descriptionIsPresent = true;
+                    break;
                 }
-            } else {
-                dispatcher.runSync("updateContent", UtilMisc.<String, Object>toMap("contentId", contentId,"contentName",descriptionCode, "localeString", languageCode,"description",descriptionText ,"userLogin", userLogin));
             }
-        } catch (XMLStreamException exception){
+
+            //create description
+            if (!descriptionIsPresent) {
+                Map<String, Object> dataResource = dispatcher.runSync("createDataResource",
+                        UtilMisc.toMap("userLogin", userLogin));
+                Object dataResourceId = dataResource.get("dataResourceId");
+                dispatcher.runSync("createElectronicText", UtilMisc.toMap("dataResourceId", dataResourceId, "textData",
+                        descriptionText, "userLogin", userLogin));
+                Map<String, Object> content = dispatcher.runSync("createContent",
+                        UtilMisc.toMap("dataResourceId", dataResourceId, "contentName", descriptionCode, "localeString",
+                                languageCode, "userLogin", userLogin));
+
+                //create productContent using parts number , content Id and content type Id
+                if (!partsNumber.equals("")) {
+                    dispatcher.runSync("createProductContent",
+                            UtilMisc.toMap("productId", partsNumber, "contentId", content.get("contentId"),
+                                    "productContentTypeId", "LONG_DESCRIPTION", "userLogin", userLogin));
+                }
+            }
+        } catch (XMLStreamException exception) {
             System.out.println(exception);
-        }
-        catch (Exception exception) {
+        } catch (Exception exception) {
             System.out.println(exception);
         }
     }
@@ -336,6 +371,19 @@ public class importXmlData {
             System.out.println("AttributeRecordNumber"+ attributeRecordNum);
             System.out.println("AttributeText: "+ attributeText);
             System.out.println("----------------------");
+            GenericValue content = EntityQuery.use(delegator).from("Content").where("contentName", attributeId,"description",attributeText).cache().queryOne();
+            String contentId = content.getString("contentId");
+            if (content == null) {
+                Map<String,Object> contentData = dispatcher.runSync("createContent", UtilMisc.<String, Object>toMap("contentName", expiCode, "localeString", extendedLanguageCode,"description",extendedInfoText, "userLogin", userLogin,"statusId","CTNT_AVAILABLE"));
+                dispatcher.runSync("createContentPurpose",UtilMisc.toMap("contentId",contentData.get("contentId"),"contentPurposeTypeId","PRODUCT_INFO","userLogin",userLogin));
+                if(!partsNumber.equals("")) {
+                    dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId",contentData.get("contentId") , "productContentTypeId", "DESCRIPTION","userLogin",userLogin));
+                }
+            } else {
+                dispatcher.runSync("updateContent", UtilMisc.<String, Object>toMap("contentId", contentId,"contentName",expiCode, "localeString", extendedLanguageCode,"description",extendedInfoText ,"userLogin", userLogin));
+            }
+
+
         } catch (XMLStreamException exception){
             System.out.println(exception);
         } catch (Exception exception){
