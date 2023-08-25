@@ -357,36 +357,28 @@ public class importXmlData {
     }
 
     private static void processProductAttribute(XMLStreamReader reader, String partNumber) {
-        try{
+        try {
             String attributeId = reader.getAttributeValue(null, "AttributeID");
             String attributeLanguageCode = reader.getAttributeValue(null, "LanguageCode");
             String attributeMaintenance = reader.getAttributeValue(null, "MaintenanceType");
             String attributePADB = reader.getAttributeValue(null, "PADBAttribute");
             String attributeRecordNum = reader.getAttributeValue(null, "RecordNumber");
             String attributeText = reader.getElementText();
-            System.out.println("AttributeID: "+ attributeId);
-            System.out.println("AttributeLanguageCode: "+ attributeLanguageCode);
-            System.out.println("AttributeMaintenanceType: "+ attributeMaintenance);
-            System.out.println("PADBAttribute: "+ attributePADB);
-            System.out.println("AttributeRecordNumber"+ attributeRecordNum);
-            System.out.println("AttributeText: "+ attributeText);
-            System.out.println("----------------------");
-            GenericValue content = EntityQuery.use(delegator).from("Content").where("contentName", attributeId,"description",attributeText).cache().queryOne();
-            String contentId = content.getString("contentId");
-            if (content == null) {
-                Map<String,Object> contentData = dispatcher.runSync("createContent", UtilMisc.<String, Object>toMap("contentName", expiCode, "localeString", extendedLanguageCode,"description",extendedInfoText, "userLogin", userLogin,"statusId","CTNT_AVAILABLE"));
-                dispatcher.runSync("createContentPurpose",UtilMisc.toMap("contentId",contentData.get("contentId"),"contentPurposeTypeId","PRODUCT_INFO","userLogin",userLogin));
-                if(!partsNumber.equals("")) {
-                    dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId",contentData.get("contentId") , "productContentTypeId", "DESCRIPTION","userLogin",userLogin));
-                }
+
+            GenericValue productAttribute = EntityQuery.use(delegator).from("ProductAttribute")
+                    .where("productId", partNumber, "attrName", attributeId).cache().queryOne();
+
+            if (productAttribute == null) {
+                dispatcher.runSync("createProductAttribute", UtilMisc.toMap("productId", partNumber, "attrName",
+                        attributeId, "attrValue", attributeText, "userLogin", userLogin));
             } else {
-                dispatcher.runSync("updateContent", UtilMisc.<String, Object>toMap("contentId", contentId,"contentName",expiCode, "localeString", extendedLanguageCode,"description",extendedInfoText ,"userLogin", userLogin));
+
+                dispatcher.runSync("updateProductAttribute", UtilMisc.toMap("productId", partNumber, "attrName",
+                        attributeId, "attrValue", attributeText, "userLogin", userLogin));
             }
-
-
-        } catch (XMLStreamException exception){
+        } catch (XMLStreamException exception) {
             System.out.println(exception);
-        } catch (Exception exception){
+        } catch (Exception exception) {
             System.out.println(exception);
         }
     }
