@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<entity-engine-xml>
+
+
+    <!-- Example of Party data-->
+    <Party partyId="Bank" partyTypeId="CORPORATION" statusId="PARTY_ENABLED" description="A Private Bank"/>
+    <Party partyId="Employee_1" partyTypeId="PERSON" statusId="PARTY_ENABLED" description="First employee of Bank"/>
+    <Party partyId="Employee_2" partyTypeId="PERSON" statusId="PARTY_ENABLED" description="Second employee of Bank"/>
+    <Party partyId="Employee_3" partyTypeId="PERSON" statusId="PARTY_ENABLED" description="Third employee of Bank"/>
+    <Party partyId="Customer_1" partyTypeId="PERSON" statusId="PARTY_ENABLED" description="First customer of Bank"/>
+    <Party partyId="Customer_2" partyTypeId="PERSON" statusId="PARTY_ENABLED" description="Second customer of Bank"/>
+    <Party partyId="Customer_3" partyTypeId="PERSON" statusId="PARTY_ENABLED" description="Third customer of Bank"/>
+    <Party partyId="Customer_4" partyTypeId="PERSON" statusId="PARTY_ENABLED" description="Fourth customer of Bank"/>
+    <Party partyId="Customer_5" partyTypeId="PERSON" statusId="PARTY_ENABLED" description="Fifth customer of Bank"/>
+
+<!-- Example of Party Group data-->
+    <PartyGroup partyId="Bank" groupName="Axis Bank" officeSiteName="http://demobank.com" annualRevenue="100000000" numEmployees="3"/>
+
+<!-- Example of Person data for Employees-->
+    <Person partyId="Employee_1" personalTitle="Mr" firstName="Gourav" middleName="Singh" lastName="Rana" birthDate="2001-02-14" employmentStatusEnumId="EMPS_FULLTIME" gender="M" />
+    <Person partyId="Employee_2" personalTitle="Miss" firstName="Niharika" lastName="Gurjar" birthDate="2001-04-12" employmentStatusEnumId="EMPS_FULLTIME" gender="F"/>
+    <Person partyId="Employee_3" personalTitle="Mr" firstName="Yash" lastName="Singhal" birthDate="2001-01-14" employmentStatusEnumId="EMPS_FULLTIME" gender="M"/>
+
+<!-- Example of Person data for Customers    -->
+    <Person partyId="Customer_1" personalTitle="Mr" firstName="Vishal" lastName="Singh" birthDate="2001-06-03"  residenceStatusEnumId="PRESS_PARENTS" gender="M" />
+    <Person partyId="Customer_2" personalTitle="Mr" firstName="Apurva" lastName="Shukla" birthDate="2001-04-10"  residenceStatusEnumId="PRESS_OWN" gender="M" />
+    <Person partyId="Customer_3" personalTitle="Miss" firstName="Priya" lastName="Singh" birthDate="2001-02-03"  residenceStatusEnumId="PRESS_PARENTS" gender="F" />
+    <Person partyId="Customer_4" personalTitle="Mr" firstName="Kunal" lastName="Bhade" birthDate="2001-03-08"  residenceStatusEnumId="PRESS_OWN" gender="M"/>
+    <Person partyId="Customer_5" personalTitle="Mr" firstName="Pushpraj" lastName="Singh" birthDate="2001-10-09"  residenceStatusEnumId="PRESS_PARENTS" gender="M"/>
+
+<!--Example of Party Attribute for Customers-->
+    <PartyAttribute attrName="AccountNumber" partyId="Customer_1" attrValue="xxxx-xxxx-xxxx-xxxx" />
+    <PartyAttribute attrName="AccountNumber" partyId="Customer_2" attrValue="xxxx-xxxx-xxxx-xxxx" />
+    <PartyAttribute attrName="AccountNumber" partyId="Customer_3" attrValue="xxxx-xxxx-xxxx-xxxx" />
+    <PartyAttribute attrName="AccountNumber" partyId="Customer_4" attrValue="xxxx-xxxx-xxxx-xxxx" />
+    <PartyAttribute attrName="AccountNumber" partyId="Customer_5" attrValue="xxxx-xxxx-xxxx-xxxx" />
+
+<!-- Example of Party Role for Bank-->
+    <PartyRole partyId="Bank" roleTypeId="ORGANIZATION_ROLE" />
+
+<!-- Example of Party Role for Employees-->
+    <PartyRole partyId="Employee_1" roleTypeId="EMPLOYEE"/>
+    <PartyRole partyId="Employee_2" roleTypeId="EMPLOYEE"/>
+    <PartyRole partyId="Employee_3" roleTypeId="EMPLOYEE"/>
+
+<!-- Example of Party Role for Customers-->
+    <PartyRole partyId="Customer_1" roleTypeId="CUSTOMER"/>
+    <PartyRole partyId="Customer_2" roleTypeId="CUSTOMER"/>
+    <PartyRole partyId="Customer_3" roleTypeId="CUSTOMER"/>
+    <PartyRole partyId="Customer_4" roleTypeId="CUSTOMER"/>
+    <PartyRole partyId="Customer_5" roleTypeId="CUSTOMER"/>
+
+<!-- Example of Party Relationship for Bank and Employee-->
+    <PartyRelationship partyIdTo="Employee_1" partyIdFrom="Bank" roleTypeIdTo="EMPLOYEE" roleTypeIdFrom="ORGANIZATION_ROLE" fromDate="2022-10-05 00:00:00.000" partyRelationshipTypeId="EMPLOYMENT"/>
+    <PartyRelationship partyIdTo="Employee_2" partyIdFrom="Bank" roleTypeIdTo="EMPLOYEE" roleTypeIdFrom="ORGANIZATION_ROLE" fromDate="2022-12-03 00:00:00.000" partyRelationshipTypeId="EMPLOYMENT"/>
+    <PartyRelationship partyIdTo="Employee_3" partyIdFrom="Bank" roleTypeIdTo="EMPLOYEE" roleTypeIdFrom="ORGANIZATION_ROLE" fromDate="2023-02-10 00:00:00.000" partyRelationshipTypeId="EMPLOYMENT"/>
+    <PartyRelationship partyIdTo="10001" partyIdFrom="Bank" roleTypeIdTo="EMPLOYEE" roleTypeIdFrom="ORGANIZATION_ROLE" fromDate="2023-07-25 00:00:00.000" partyRelationshipTypeId="EMPLOYMENT"/>
+
+<!-- Example of Party Relationship for Bank and Customer-->
+    <PartyRelationship partyIdTo="Customer_1" partyIdFrom="Bank" roleTypeIdTo="CUSTOMER" roleTypeIdFrom="ORGANIZATION_ROLE" fromDate="2023-03-11 00:00:00.000" partyRelationshipTypeId="CUSTOMER_REL"/>
+    <PartyRelationship partyIdTo="Customer_2" partyIdFrom="Bank" roleTypeIdTo="CUSTOMER" roleTypeIdFrom="ORGANIZATION_ROLE" fromDate="2023-05-23 00:00:00.000" partyRelationshipTypeId="CUSTOMER_REL"/>
+    <PartyRelationship partyIdTo="Customer_3" partyIdFrom="Bank" roleTypeIdTo="CUSTOMER" roleTypeIdFrom="ORGANIZATION_ROLE" fromDate="2023-06-10 00:00:00.000" partyRelationshipTypeId="CUSTOMER_REL"/>
+    <PartyRelationship partyIdTo="Customer_4" partyIdFrom="Bank" roleTypeIdTo="CUSTOMER" roleTypeIdFrom="ORGANIZATION_ROLE" fromDate="2023-06-23 00:00:00.000" partyRelationshipTypeId="CUSTOMER_REL"/>
+    <PartyRelationship partyIdTo="Customer_5" partyIdFrom="Bank" roleTypeIdTo="CUSTOMER" roleTypeIdFrom="ORGANIZATION_ROLE" fromDate="2023-07-10 00:00:00.000" partyRelationshipTypeId="CUSTOMER_REL"/>
+
+<!-- Example of Contact Mech for Bank-->
+    <ContactMech contactMechId="Bank_Email" contactMechTypeId="EMAIL_ADDRESS" infoString="bank@gmail.co"/>
+    <ContactMech contactMechId="Bank_PostalAddress" contactMechTypeId="POSTAL_ADDRESS" />
+    <ContactMech contactMechId="Bank_Telecom" contactMechTypeId="TELECOM_NUMBER" />
+
+<!-- Example of Contact Mech for Employees-->
+
+<!--  Employee_1-->
+    <ContactMech contactMechId="Emp1_Email" contactMechTypeId="EMAIL_ADDRESS" infoString="employee1@gmail.com"/>
+    <ContactMech contactMechId="Emp1_PostalAddress" contactMechTypeId="POSTAL_ADDRESS" />
+    <ContactMech contactMechId="Emp1_Telecom" contactMechTypeId="TELECOM_NUMBER" />
+
+<!--  Employee_2-->
+    <ContactMech contactMechId="Emp2_Email" contactMechTypeId="EMAIL_ADDRESS" infoString="employee2@gmail.com" />
+    <ContactMech contactMechId="Emp2_PostalAddress" contactMechTypeId="POSTAL_ADDRESS"/>
+    <ContactMech contactMechId="Emp2_Telecom" contactMechTypeId="TELECOM_NUMBER" />
+
+<!--  Employee_3-->
+    <ContactMech contactMechId="Emp3_Email" contactMechTypeId="EMAIL_ADDRESS" infoString="employee3@gmail.com"/>
+    <ContactMech contactMechId="Emp3_PostalAddress" contactMechTypeId="POSTAL_ADDRESS"/>
+    <ContactMech contactMechId="Emp3_Telecom" contactMechTypeId="TELECOM_NUMBER" />
+
+
+<!-- Example of Contact Mach for Customers-->
+
+    <!--  Customer 1-->
+    <ContactMech contactMechId="Cust1_Email"  contactMechTypeId="EMAIL_ADDRESS" infoString="customer1@gmail.com"/>
+    <ContactMech contactMechId="Cust1_PostalAddress"  contactMechTypeId="POSTAL_ADDRESS"/>
+    <ContactMech contactMechId="Cust1_Telecom"  contactMechTypeId="TELECOM_NUMBER"/>
+
+<!--    Customer 2-->
+    <ContactMech contactMechId="Cust2_Email"  contactMechTypeId="EMAIL_ADDRESS" infoString="customer2@gmail.com"/>
+    <ContactMech contactMechId="Cust2_PostalAddress"  contactMechTypeId="POSTAL_ADDRESS"/>
+    <ContactMech contactMechId="Cust2_Telecom"  contactMechTypeId="TELECOM_NUMBER"/>
+
+<!--    customer 3-->
+    <ContactMech contactMechId="Cust3_Email"  contactMechTypeId="EMAIL_ADDRESS" infoString="customer3@gmail.com"/>
+    <ContactMech contactMechId="Cust3_PostalAddress"  contactMechTypeId="POSTAL_ADDRESS"/>
+    <ContactMech contactMechId="Cust3_Telecom"  contactMechTypeId="TELECOM_NUMBER"/>
+
+<!--    customer 4-->
+    <ContactMech contactMechId="Cust4_Email"  contactMechTypeId="EMAIL_ADDRESS" infoString="customer4@gmail.com"/>
+    <ContactMech contactMechId="Cust4_PostalAddress"  contactMechTypeId="POSTAL_ADDRESS"/>
+    <ContactMech contactMechId="Cust4_Telecom"  contactMechTypeId="TELECOM_NUMBER"/>
+
+<!--    customer 5-->
+    <ContactMech contactMechId="Cust5_Email"  contactMechTypeId="EMAIL_ADDRESS" infoString="customer5@gmail.com"/>
+    <ContactMech contactMechId="Cust5_PostalAddress"  contactMechTypeId="POSTAL_ADDRESS"/>
+    <ContactMech contactMechId="Cust5_Telecom"  contactMechTypeId="TELECOM_NUMBER"/>
+
+<!-- Example of telecom number-->
+    <TelecomNumber contactMechId="Bank_Telecom" countryCode="+91" contactNumber="xxxxxxxxxx" />
+    <TelecomNumber contactMechId="Emp1_Telecom" countryCode="+91" contactNumber="xxxxxxxxxx" />
+    <TelecomNumber contactMechId="Emp2_Telecom" countryCode="+91" contactNumber="xxxxxxxxxx" />
+    <TelecomNumber contactMechId="Emp3_Telecom" countryCode="+91" contactNumber="xxxxxxxxxx" />
+    <TelecomNumber contactMechId="Cust1_Telecom" countryCode="+91" contactNumber="xxxxxxxxxx" />
+    <TelecomNumber contactMechId="Cust2_Telecom" countryCode="+91" contactNumber="xxxxxxxxxx" />
+    <TelecomNumber contactMechId="Cust3_Telecom" countryCode="+91" contactNumber="xxxxxxxxxx" />
+    <TelecomNumber contactMechId="Cust4_Telecom" countryCode="+91" contactNumber="xxxxxxxxxx" />
+    <TelecomNumber contactMechId="Cust5_Telecom" countryCode="+91" contactNumber="xxxxxxxxxx" />
+
+<!-- Example of postal address-->
+   <PostalAddress contactMechId="Bank_PostalAddress" address1="Sch No. 136, Vijay Nagar" houseNumber="112" city="Indore" postalCode="xxxxx"/>
+    <PostalAddress contactMechId="Emp1_PostalAddress" address1="Sch No. 78, Vijay Nagar" houseNumber="145" city="Indore" postalCode="xxxxx"/>
+    <PostalAddress contactMechId="Emp2_PostalAddress" address1="Sch No. 74, Vijay Nagar" houseNumber="156" city="Indore" postalCode="xxxxx"/>
+    <PostalAddress contactMechId="Emp3_PostalAddress" address1="Sch No. 54, Vijay Nagar" houseNumber="167" city="Indore" postalCode="xxxxx"/>
+    <PostalAddress contactMechId="Cust1_PostalAddress" address1="Sch No. 136, Vijay Nagar" houseNumber="123" city="Indore" postalCode="xxxxx"/>
+    <PostalAddress contactMechId="Cust2_PostalAddress" address1="Sch No. 136, Vijay Nagar" houseNumber="12" city="Indore" postalCode="xxxxx"/>
+    <PostalAddress contactMechId="Cust3_PostalAddress" address1="Sch No. 136, Vijay Nagar" houseNumber="126" city="Indore" postalCode="xxxxx"/>
+    <PostalAddress contactMechId="Cust4_PostalAddress" address1="Sch No. 136, Vijay Nagar" houseNumber="178" city="Indore" postalCode="xxxxx"/>
+    <PostalAddress contactMechId="Cust5_PostalAddress" address1="Sch No. 136, Vijay Nagar" houseNumber="234" city="Indore" postalCode="xxxxx"/>
+
+<!-- Example of Party Contact Mech for Bank-->
+    <PartyContactMech  partyId="Bank" contactMechId="Bank_Email" fromDate="2022-09-05 00:00:00.000" />
+    <PartyContactMech  partyId="Bank" contactMechId="Bank_PostalAddress" fromDate="2022-09-05 00:00:00.000" />
+    <PartyContactMech  partyId="Bank" contactMechId="Bank_Telecom" fromDate="2022-09-05 00:00:00.000" />
+    <PartyContactMechPurpose partyId="Bank" contactMechId="Bank_Email" contactMechPurposeTypeId="PRIMARY_EMAIL" fromDate="2022-09-05 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Bank" contactMechId="Bank_PostalAddress" contactMechPurposeTypeId="PRIMARY_LOCATION" fromDate="2022-09-05 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Bank" contactMechId="Bank_Telecom" contactMechPurposeTypeId="PRIMARY_PHONE" fromDate="2022-09-05 00:00:00.000"/>
+
+
+<!-- Example of Party Contact Mech for Employees-->
+
+<!-- Employee_1-->
+    <PartyContactMech  partyId="Employee_1" contactMechId="Emp1_Email" fromDate="2022-10-05 00:00:00.000" />
+    <PartyContactMech  partyId="Employee_1" contactMechId="Emp1_PostalAddress" fromDate="2022-10-05 00:00:00.000" />
+    <PartyContactMech  partyId="Employee_1" contactMechId="Emp1_Telecom" fromDate="2022-10-05 00:00:00.000" />
+    <PartyContactMechPurpose partyId="Employee_1" contactMechId="Emp1_Email" contactMechPurposeTypeId="PRIMARY_EMAIL" fromDate="2022-10-05 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Employee_1" contactMechId="Emp1_PostalAddress" contactMechPurposeTypeId="PRIMARY_LOCATION" fromDate="2022-10-05 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Employee_1" contactMechId="Emp1_Telecom" contactMechPurposeTypeId="PRIMARY_PHONE" fromDate="2022-10-05 00:00:00.000"/>
+
+    <!-- Employee_2-->
+    <PartyContactMech  partyId="Employee_2" contactMechId="Emp2_Email" fromDate="2022-12-03 00:00:00.000" />
+    <PartyContactMech  partyId="Employee_2" contactMechId="Emp2_PostalAddress" fromDate="2022-12-03 00:00:00.000" />
+    <PartyContactMech  partyId="Employee_2" contactMechId="Emp2_Telecom" fromDate="2022-12-03 00:00:00.000" />
+    <PartyContactMechPurpose partyId="Employee_2" contactMechId="Emp2_Email" contactMechPurposeTypeId="PRIMARY_EMAIL" fromDate="2022-12-03 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Employee_2" contactMechId="Emp2_PostalAddress" contactMechPurposeTypeId="PRIMARY_LOCATION" fromDate="2022-12-03 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Employee_2" contactMechId="Emp2_Telecom" contactMechPurposeTypeId="PRIMARY_PHONE" fromDate="2022-12-03 00:00:00.000"/>
+
+    <!-- Employee_3-->
+    <PartyContactMech  partyId="Employee_3" contactMechId="Emp3_Email" fromDate="2023-02-10 00:00:00.000" />
+    <PartyContactMech  partyId="Employee_3" contactMechId="Emp3_PostalAddress" fromDate="2023-02-10 00:00:00.000" />
+    <PartyContactMech  partyId="Employee_3" contactMechId="Emp3_Telecom" fromDate="2023-02-10 00:00:00.000" />
+    <PartyContactMechPurpose partyId="Employee_3" contactMechId="Emp3_Email" contactMechPurposeTypeId="PRIMARY_EMAIL" fromDate="2023-02-10 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Employee_3" contactMechId="Emp3_PostalAddress" contactMechPurposeTypeId="PRIMARY_LOCATION" fromDate="2023-02-10 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Employee_3" contactMechId="Emp3_Telecom" contactMechPurposeTypeId="PRIMARY_PHONE" fromDate="2023-02-10 00:00:00.000"/>
+
+    <!-- Example of Party Contact Mech for Customers-->
+
+    <!-- Customer_1-->
+    <PartyContactMech  partyId="Customer_1" contactMechId="Cust1_Email" fromDate="2023-03-11 00:00:00.000" />
+    <PartyContactMech  partyId="Customer_1" contactMechId="Cust1_PostalAddress" fromDate="2023-03-11 00:00:00.000" />
+    <PartyContactMech  partyId="Customer_1" contactMechId="Cust1_Telecom" fromDate="2023-03-11 00:00:00.000" />
+    <PartyContactMechPurpose partyId="Customer_1" contactMechId="Cust1_Email" contactMechPurposeTypeId="PRIMARY_EMAIL" fromDate="2023-03-11 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Customer_1" contactMechId="Cust1_PostalAddress" contactMechPurposeTypeId="PRIMARY_LOCATION" fromDate="2023-03-11 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Customer_1" contactMechId="Cust1_Telecom" contactMechPurposeTypeId="PRIMARY_PHONE" fromDate="2023-03-11 00:00:00.000"/>
+
+    <!-- Customer_2-->
+    <PartyContactMech  partyId="Customer_2" contactMechId="Cust2_Email" fromDate="2023-05-23 00:00:00.000" />
+    <PartyContactMech  partyId="Customer_2" contactMechId="Cust2_PostalAddress" fromDate="2023-05-23 00:00:00.000" />
+    <PartyContactMech  partyId="Customer_2" contactMechId="Cust2_Telecom" fromDate="2023-05-23 00:00:00.000" />
+    <PartyContactMechPurpose partyId="Customer_2" contactMechId="Cust2_Email" contactMechPurposeTypeId="PRIMARY_EMAIL" fromDate="2023-05-23 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Customer_2" contactMechId="Cust2_PostalAddress" contactMechPurposeTypeId="PRIMARY_LOCATION" fromDate="2023-05-23 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Customer_2" contactMechId="Cust2_Telecom" contactMechPurposeTypeId="PRIMARY_PHONE" fromDate="2023-05-23 00:00:00.000"/>
+
+    <!-- Customer_3-->
+    <PartyContactMech  partyId="Customer_3" contactMechId="Cust3_Email" fromDate="2023-06-10 00:00:00.000" />
+    <PartyContactMech  partyId="Customer_3" contactMechId="Cust3_PostalAddress" fromDate="2023-06-10 00:00:00.000" />
+    <PartyContactMech  partyId="Customer_3" contactMechId="Cust3_Telecom" fromDate="2023-06-10 00:00:00.000" />
+    <PartyContactMechPurpose partyId="Customer_3" contactMechId="Cust3_Email" contactMechPurposeTypeId="PRIMARY_EMAIL" fromDate="2023-06-10 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Customer_3" contactMechId="Cust3_PostalAddress" contactMechPurposeTypeId="PRIMARY_LOCATION" fromDate="2023-06-10 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Customer_3" contactMechId="Cust3_Telecom" contactMechPurposeTypeId="PRIMARY_PHONE" fromDate="2023-06-10 00:00:00.000"/>
+
+    <!-- Customer_4-->
+    <PartyContactMech  partyId="Customer_4" contactMechId="Cust4_Email" fromDate="2023-06-23 00:00:00.000" />
+    <PartyContactMech  partyId="Customer_4" contactMechId="Cust4_PostalAddress" fromDate="2023-06-23 00:00:00.000" />
+    <PartyContactMech  partyId="Customer_4" contactMechId="Cust4_Telecom" fromDate="2023-06-23 00:00:00.000" />
+    <PartyContactMechPurpose partyId="Customer_4" contactMechId="Cust4_Email" contactMechPurposeTypeId="PRIMARY_EMAIL" fromDate="2023-06-23 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Customer_4" contactMechId="Cust4_PostalAddress" contactMechPurposeTypeId="PRIMARY_LOCATION" fromDate="2023-06-23 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Customer_4" contactMechId="Cust4_Telecom" contactMechPurposeTypeId="PRIMARY_PHONE" fromDate="2023-06-23 00:00:00.000"/>
+
+    <!-- Customer_1-->
+    <PartyContactMech  partyId="Customer_5" contactMechId="Cust5_Email" fromDate="2023-07-10 00:00:00.000" />
+    <PartyContactMech  partyId="Customer_5" contactMechId="Cust5_PostalAddress" fromDate="2023-07-10 00:00:00.000" />
+    <PartyContactMech  partyId="Customer_5" contactMechId="Cust5_Telecom" fromDate="2023-07-10 00:00:00.000" />
+    <PartyContactMechPurpose partyId="Customer_5" contactMechId="Cust5_Email" contactMechPurposeTypeId="PRIMARY_EMAIL" fromDate="2023-07-10 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Customer_5" contactMechId="Cust5_PostalAddress" contactMechPurposeTypeId="PRIMARY_LOCATION" fromDate="2023-07-10 00:00:00.000"/>
+    <PartyContactMechPurpose partyId="Customer_5" contactMechId="Cust5_Telecom" contactMechPurposeTypeId="PRIMARY_PHONE" fromDate="2023-07-10 00:00:00.000"/>
+
+
+
+</entity-engine-xml>
