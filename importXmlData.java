@@ -1,5 +1,7 @@
-
 //Imports neccessary packages
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -31,6 +33,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import org.apache.ofbiz.entity.condition.EntityCondition;
 import org.apache.ofbiz.entity.condition.EntityOperator;
+import java.util.Objects;
 
 public class parseXml {
 
@@ -126,24 +129,6 @@ public class parseXml {
                             break;
                         case "PartNumber":
                             partNumber = reader.getElementText();
-
-                            // create a Product using PartNumber
-                            Map<String, Object> productPartsData = new HashMap<>();
-                            productPartsData.put("productId", partNumber);
-                            productPartsData.put("productTypeId", "MARKETING_PKG_AUTO");
-                            productPartsData.put("internalName", partNumber);
-                            productPartsData.put("userLogin", userLogin);
-                            try {
-                                GenericValue product = EntityQuery.use(delegator).from("Product")
-                                        .where("productId", partNumber).cache().queryOne();
-
-                                // create a new Product
-                                if (product == null) {
-                                    dispatcher.runSync("createProduct", productPartsData);
-                                }
-                            } catch (Exception e) {
-                                System.out.println(e);
-                            }
                             break;
                         case "BrandAAIAID":
                             brandAAIAID = reader.getElementText();
@@ -206,14 +191,17 @@ public class parseXml {
                 }
             }
 
-            // Updated Product Data
+            // Product Data
             Map<String, Object> productData = new HashMap<>();
+            productData.put("productId", partNumber);
+            productData.put("internalName", partNumber);
+            productData.put("productTypeId", "AGGREGATED_CONF");
             productData.put("brandName", brandLabel);
             productData.put("quantityIncluded", itemQuantitySize);
             productData.put("shippingHeight", packageData.get("Height"));
             productData.put("shippingWidth", packageData.get("Width"));
             productData.put("shippingWeight", packageData.get("Weight"));
-            productData.put("shippingDepth",packageData.get("Length"));
+            productData.put("shippingDepth", packageData.get("Length"));
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
             Date parsedDate = dateFormat.parse(availableDate);
@@ -222,48 +210,24 @@ public class parseXml {
             Timestamp timestamp = new Timestamp(parsedDate.getTime());
 
             productData.put("releaseDate", timestamp);
-            productData.put("productTypeId", "MARKETING_PKG_AUTO");
             productData.put("userLogin", userLogin);
-            productData.put("productId", partNumber);
 
             if (quantityUomId.equals("EA")) {
                 productData.put("quantityUomId", "OTH_ea");
             }
 
-            dispatcher.runSync("updateProduct", productData);
+            // process Product Data
+            processProductInformation(productData);
 
-            //check brandAAIAID present or not with prroductId
-            GenericValue productAttribute = EntityQuery.use(delegator).from("ProductAttribute")
-                    .where("productId",partNumber,"attrName","BrandAAIAID").cache().queryOne();
+            // process BrandAAIAID
+            processBrandAAIAID(partNumber, brandAAIAID);
 
-            if(productAttribute == null) {
-                // save branAAIAID in Product Attribute
-                dispatcher.runSync("createProductAttribute", UtilMisc.toMap("productId", partNumber, "attrName",
-                        "BrandAAIAID", "attrValue", brandAAIAID, "userLogin", userLogin));
-            }
-            // Check the GTIN code for Item is present or not
-            GenericValue goodIdentificatioForItem = EntityQuery.use(delegator).from("GoodIdentification")
-                    .where("productId", partNumber, "goodIdentificationTypeId", "UPCA").cache().queryOne();
-            if (goodIdentificatioForItem == null) {
-                dispatcher.runSync("createGoodIdentification", UtilMisc.toMap("productId", partNumber,
-                        "goodIdentificationTypeId", "UPCA", "idValue", itemLevelGTIN, "userLogin", userLogin));
-            } else {
-                dispatcher.runSync("updateGoodIdentification", UtilMisc.toMap("productId", partNumber,
-                        "goodIdentificationTypeId", "UPCA", "idValue", itemLevelGTIN, "userLogin", userLogin));
-            }
+            // process GTINCODE for Item
+            processGoodIdentification(partNumber, itemLevelGTIN, "UPCA");
 
-            // check the GTIN code for Package is present or not
-            GenericValue goodIdentificatioForPackage = EntityQuery.use(delegator).from("GoodIdentification")
-                    .where("productId", partNumber, "goodIdentificationTypeId", "GTIN-14").cache().queryOne();
-            if (goodIdentificatioForPackage == null) {
-                dispatcher.runSync("createGoodIdentification",
-                        UtilMisc.toMap("productId", partNumber, "goodIdentificationTypeId", "GTIN-14", "idValue",
-                                packageData.get("PackageLevelGSTIN"), "userLogin", userLogin));
-            } else {
-                dispatcher.runSync("updateGoodIdentification",
-                        UtilMisc.toMap("productId", partNumber, "goodIdentificationTypeId", "GTIN-14", "idValue",
-                                packageData.get("PackageLevelGSTIN"), "userLogin", userLogin));
-            }
+            // process GTINCODE for Package
+            String packageGTINCode = (String) packageData.get("PackageLevelGSTIN");
+            processGoodIdentification(partNumber, packageGTINCode, "GTIN-14");
 
             if (hazardousMaterialCode.equals("Y")) {
                 Map<String, Object> productFeatureData = dispatcher.runSync("createProductFeature", UtilMisc.toMap(
@@ -274,150 +238,307 @@ public class parseXml {
                                 "STANDARD_FEATURE", "userLogin", userLogin));
             }
 
-            //process Descriptions
-            processDescriptions(descriptionsData,partNumber);
+            // process Descriptions
+            processDescriptions(descriptionsData, partNumber);
 
-            //process Extended Informations
-            processExtendedInformations(extendedInformationData,partNumber);
+            // process Extended Informations
+            processExtendedInformations(extendedInformationData, partNumber);
 
-            //process Product Attributes
-            processProductsAttributes(productAttributesData,partNumber);
+            // process Product Attributes
+            processProductsAttributes(productAttributesData, partNumber);
 
-            //process partInterChangeData
-            processProductsPartInterchange(partInterchangeData,partNumber);
+            // process partInterChangeData
+            processProductsPartInterchange(partInterchangeData, partNumber);
 
-            //process products Digital Assets Informations
-            processProductsDigitalInformations(digitalAssetsInformation,partNumber);
+            // process products Digital Assets Informations
+            processProductsDigitalInformations(digitalAssetsInformation, partNumber);
 
         } catch (XMLStreamException exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         } catch (Exception exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         }
     }
 
-    // Process the Description of each Item
-    private static Map<String,Object> parseDescription(XMLStreamReader reader) {
-        Map<String,Object> descriptionData = new HashMap<>();
+    // Process Product Information
+    private static void processProductInformation(Map<String, Object> productData) {
+        try {
+            GenericValue product = null;
+            try {
+                // Query the database for the product using productId
+                product = EntityQuery.use(delegator).from("Product")
+                        .where("productId", productData.get("productId")).cache().queryOne();
+            } catch (GenericEntityException exception) {
+                exception.printStackTrace();
+            }
+            // Create a new Product if it doesn't exist
+            if (product == null) {
+                dispatcher.runSync("createProduct", productData);
+            } else {
+                // Update the existing Product
+                dispatcher.runSync("updateProduct", productData);
+            }
+        } catch (Exception exception) {
+            exception.printStackTrace();
+        }
+    }
+
+    // Process Brand AAIAID
+    private static void processBrandAAIAID(String partNumber, String brandValue) {
+        try {
+            GenericValue productAttribute = null;
+            try {
+                // Query the database for a product attribute named "BrandAAIAID" with the given
+                // partNumber
+                productAttribute = EntityQuery.use(delegator).from("ProductAttribute")
+                        .where("productId", partNumber, "attrName", "BrandAAIAID").cache().queryOne();
+            } catch (GenericEntityException exception) {
+                exception.printStackTrace();
+            }
+
+            // If the product attribute "BrandAAIAID" doesn't exist, create it
+            if (productAttribute == null) {
+                dispatcher.runSync("createProductAttribute", UtilMisc.toMap("productId", partNumber, "attrName",
+                        "BrandAAIAID", "attrValue", brandValue, "userLogin", userLogin));
+            }
+        } catch (Exception exception) {
+            exception.printStackTrace();
+        }
+    }
+
+    // Process Good Identification
+    private static void processGoodIdentification(String partNumber, String GTINCode, String GTINType) {
+        try {
+            GenericValue goodIdentificationForItem = null;
+            try {
+                // Query the database for a good identification with the given GTIN code and
+                // type
+                goodIdentificationForItem = EntityQuery.use(delegator).from("GoodIdentification")
+                        .where("productId", partNumber, "goodIdentificationTypeId", GTINType).cache().queryOne();
+            } catch (GenericEntityException exception) {
+                exception.printStackTrace();
+            }
+
+            // Create or Update the Good Identification based on its presence
+            if (goodIdentificationForItem == null) {
+                // Create a new Good Identification
+                dispatcher.runSync("createGoodIdentification", UtilMisc.toMap("productId", partNumber,
+                        "goodIdentificationTypeId", GTINType, "idValue", GTINCode, "userLogin", userLogin));
+            } else {
+                // Update the existing Good Identification
+                dispatcher.runSync("updateGoodIdentification", UtilMisc.toMap("productId", partNumber,
+                        "goodIdentificationTypeId", GTINType, "idValue", GTINCode, "userLogin", userLogin));
+            }
+        } catch (Exception exception) {
+            exception.printStackTrace();
+        }
+    }
+
+    // Parse the Description of each Item
+    private static Map<String, Object> parseDescription(XMLStreamReader reader) {
+        Map<String, Object> descriptionData = new HashMap<>();
         try {
             String descriptionCode = reader.getAttributeValue(null, "DescriptionCode");
             String languageCode = reader.getAttributeValue(null, "LanguageCode");
             String maintenanceType = reader.getAttributeValue(null, "MaintenanceType");
             String descriptionText = reader.getElementText();
-            descriptionData.put("descriptionCode",descriptionCode);
-            descriptionData.put("languageCode",languageCode);
-            descriptionData.put("descriptionText",descriptionText);
+            descriptionData.put("descriptionCode", descriptionCode);
+            descriptionData.put("languageCode", languageCode);
+            descriptionData.put("descriptionText", descriptionText);
         } catch (XMLStreamException exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         } catch (Exception exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         }
         return descriptionData;
     }
 
-    private static void processDescriptions(List<Map<String,Object>> descriptionsData,String partsNumber){
-        for(Map<String,Object> descriptionData : descriptionsData){
-            Object descriptionCode = descriptionData.get("descriptionCode");
-            Object languageCode = descriptionData.get("languageCode");
-            Object descriptionText = descriptionData.get("descriptionText");
-            try{
-                boolean descriptionIsPresent = false;
+    // Process Description
+    private static void processDescriptions(List<Map<String, Object>> descriptionsData, String partsNumber) {
+        // Iterate through each description data
+        descriptionsData.stream().forEach(descriptionData -> {
+            String descriptionCode = (String) descriptionData.get("descriptionCode");
+            String languageCode = (String) descriptionData.get("languageCode");
+            String descriptionText = (String) descriptionData.get("descriptionText");
 
-                //Entity condition for find the contentId's associate with product
+            try {
+                // Create a condition to query for product contents
                 EntityCondition condition = EntityCondition.makeCondition(
                         EntityOperator.AND,
                         EntityCondition.makeCondition("productId", partsNumber),
                         EntityCondition.makeCondition("productContentTypeId", "LONG_DESCRIPTION"));
 
-                // fetch all the productContent using productId and productContentTypeId
-                List<GenericValue> productContents = EntityQuery.use(delegator).from("ProductContent").where(condition)
-                        .cache().queryList();
+                List<GenericValue> productContents = null;
+                try {
+                    // Query the database for matching product contents
+                    productContents = EntityQuery.use(delegator)
+                            .from("ProductContent")
+                            .where(condition)
+                            .cache()
+                            .queryList();
+                } catch (GenericEntityException exception) {
+                    exception.printStackTrace();
+                }
 
-                //Search the contentId using descriptionCode
-                for (GenericValue productContent : productContents) {
-                    Object contentId = productContent.get("contentId");
-                    GenericValue descriptionContent = EntityQuery.use(delegator).from("Content")
-                            .where("contentId", contentId, "contentName", descriptionCode).cache().queryOne();
-
-                    //update decription
-                    if (descriptionContent != null) {
-                        Object dataResourceId = descriptionContent.get("dataResourceId");
-                        dispatcher.runSync("updateElectronicText", UtilMisc.toMap("dataResourceId", dataResourceId,
-                                "textData", descriptionText, "userLogin", userLogin));
-                        descriptionIsPresent = true;
-                        break;
+                GenericValue descriptionContent = null;
+                if (productContents != null) {
+                    try {
+                        // Find the appropriate description content by filtering and mapping
+                        descriptionContent = productContents.stream()
+                                .map(productContent -> productContent.get("contentId"))
+                                .map(contentId -> {
+                                    GenericValue content = null;
+                                    try {
+                                        // Query the database for content information
+                                        content = EntityQuery.use(delegator)
+                                                .from("Content")
+                                                .where("contentId", contentId, "contentName", descriptionCode)
+                                                .cache()
+                                                .queryOne();
+                                    } catch (GenericEntityException exception) {
+                                        exception.printStackTrace();
+                                    }
+                                    return content;
+                                })
+                                .filter(Objects::nonNull)
+                                .findFirst()
+                                .orElse(null);
+                    } catch (Exception exception) {
+                        exception.printStackTrace();
                     }
                 }
 
-                //create description
-                if (!descriptionIsPresent) {
+                if (descriptionContent != null) {
+                    // If description content exists, update it with new text data
+                    Object dataResourceId = descriptionContent.get("dataResourceId");
+                    dispatcher.runSync("updateElectronicText", UtilMisc.toMap("dataResourceId", dataResourceId,
+                            "textData", descriptionText, "userLogin", userLogin));
+
+                } else {
+                    // If description content doesn't exist, create new data resource, electronic text, and content
                     Map<String, Object> dataResource = dispatcher.runSync("createDataResource",
                             UtilMisc.toMap("userLogin", userLogin));
                     Object dataResourceId = dataResource.get("dataResourceId");
-                    dispatcher.runSync("createElectronicText", UtilMisc.toMap("dataResourceId", dataResourceId, "textData",
-                            descriptionText, "userLogin", userLogin));
-                    Map<String, Object> content = dispatcher.runSync("createContent",
-                            UtilMisc.toMap("dataResourceId", dataResourceId, "contentName", descriptionCode, "localeString",
-                                    languageCode, "userLogin", userLogin));
 
-                    //create productContent using parts number , content Id and content type Id
-                    if (!partsNumber.equals("")) {
-                        dispatcher.runSync("createProductContent",
-                                UtilMisc.toMap("productId", partsNumber, "contentId", content.get("contentId"),
-                                        "productContentTypeId", "LONG_DESCRIPTION", "userLogin", userLogin));
-                    }
+                    dispatcher.runSync("createElectronicText",
+                            UtilMisc.toMap("dataResourceId", dataResourceId, "textData",
+                                    descriptionText, "userLogin", userLogin));
+
+                    Map<String, Object> content = dispatcher.runSync("createContent",
+                            UtilMisc.toMap("dataResourceId", dataResourceId, "contentName", descriptionCode,
+                                    "localeString", languageCode, "userLogin", userLogin));
+
+                    //Associate content with the product
+                    dispatcher.runSync("createProductContent",
+                            UtilMisc.toMap("productId", partsNumber, "contentId", content.get("contentId"),
+                                    "productContentTypeId", "LONG_DESCRIPTION", "userLogin", userLogin));
                 }
-            }  catch (Exception exception) {
-                System.out.println(exception);
+
+            } catch (Exception exception) {
+                exception.printStackTrace();
             }
-        }
+        });
     }
 
-    // Process the ProductExtendedInformation
-    private static Map<String,Object> parseExtendedInformation(XMLStreamReader reader) {
-        Map<String,Object> productExtendedInformation = new HashMap<>();
+    // Parse the ProductExtendedInformation
+    private static Map<String, Object> parseExtendedInformation(XMLStreamReader reader) {
+        Map<String, Object> productExtendedInformation = new HashMap<>();
         try {
             String expiCode = reader.getAttributeValue(null, "EXPICode");
             String extendedLanguageCode = reader.getAttributeValue(null, "LanguageCode");
             String extendedMaintenanceType = reader.getAttributeValue(null, "MaintenanceType");
             String extendedInfoText = reader.getElementText();
-            productExtendedInformation.put("expiCode",expiCode);
-            productExtendedInformation.put("extendedLanguageCode",extendedLanguageCode);
-            productExtendedInformation.put("extendedInfoText",extendedInfoText);
+            productExtendedInformation.put("expiCode", expiCode);
+            productExtendedInformation.put("extendedLanguageCode", extendedLanguageCode);
+            productExtendedInformation.put("extendedInfoText", extendedInfoText);
         } catch (XMLStreamException exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         } catch (Exception exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         }
         return productExtendedInformation;
     }
 
-    private static void processExtendedInformations(List<Map<String,Object>> extendedInformationData,String partsNumber){
-        for(Map<String,Object> extendedInformation : extendedInformationData){
-            Object expiCode = extendedInformation.get("expiCode");
-            Object extendedLanguageCode = extendedInformation.get("extendedLanguageCode");
-            Object extendedInfoText = extendedInformation.get("extendedInfoText");
+    // Process Extended Information
+    private static void processExtendedInformations(List<Map<String, Object>> extendedInformationData, String partsNumber) {
 
-            boolean informationIsPresent = false;
-            try{
-                //create content for Extended information
-                Map<String, Object> contentData = dispatcher.runSync("createContent",
-                        UtilMisc.<String, Object>toMap("contentName", expiCode, "localeString", extendedLanguageCode,
-                                "description", extendedInfoText, "userLogin", userLogin, "statusId", "CTNT_AVAILABLE"));
-                dispatcher.runSync("createContentPurpose", UtilMisc.toMap("contentId", contentData.get("contentId"),
-                        "contentPurposeTypeId", "PRODUCT_INFO", "userLogin", userLogin));
-                if (!partsNumber.equals("")) {
-                    dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId",
-                            contentData.get("contentId"), "productContentTypeId", "EXT_INFO", "userLogin", userLogin));
+        // Iterate through each extended information data
+        extendedInformationData.stream().forEach(extendedInformation -> {
+            String expiCode = (String) extendedInformation.get("expiCode");
+            String extendedLanguageCode = (String) extendedInformation.get("extendedLanguageCode");
+            String extendedInfoText = (String) extendedInformation.get("extendedInfoText");
+
+            try {
+                // Create a condition to query for product contents
+                EntityCondition condition = EntityCondition.makeCondition(
+                        EntityOperator.AND,
+                        EntityCondition.makeCondition("productId", partsNumber),
+                        EntityCondition.makeCondition("productContentTypeId", "EXT_INFO"));
+
+                List<GenericValue> productContents = null;
+                // Query the database for matching product contents
+                try {
+                    productContents = EntityQuery.use(delegator)
+                            .from("ProductContent")
+                            .where(condition)
+                            .cache()
+                            .queryList();
+                } catch (GenericEntityException exception) {
+                    exception.printStackTrace();
                 }
-            }  catch (Exception exception) {
-                System.out.println(exception);
+
+                GenericValue extendedContent = null;
+                if (productContents != null) {
+                    try {
+                        // Find the appropriate extended content by filtering and mapping
+                        extendedContent = productContents.stream()
+                                .map(productContent -> productContent.get("contentId"))
+                                .map(contentId -> {
+                                    GenericValue content = null;
+                                    try {
+                                        // Query the database for content information
+                                        content = EntityQuery.use(delegator)
+                                                .from("Content")
+                                                .where("contentId", contentId, "contentName", expiCode, "description",
+                                                        extendedInfoText,
+                                                        "localeString", extendedLanguageCode)
+                                                .cache()
+                                                .queryOne();
+                                    } catch (GenericEntityException exception) {
+                                        exception.printStackTrace();
+                                    }
+                                    return content;
+                                })
+                                .filter(Objects::nonNull)
+                                .findFirst()
+                                .orElse(null);
+                    } catch (Exception exception) {
+                        exception.printStackTrace();
+                    }
+                }
+
+                if (extendedContent == null) {
+                    // If extended content doesn't exist, create new content and associate with
+                    // product
+                    Map<String, Object> contentData = dispatcher.runSync("createContent",
+                            UtilMisc.<String, Object>toMap("contentName", expiCode, "localeString",
+                                    extendedLanguageCode,
+                                    "description", extendedInfoText, "userLogin", userLogin, "statusId",
+                                    "CTNT_AVAILABLE"));
+                    dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId",
+                            contentData.get("contentId"), "productContentTypeId", "EXT_INFO", "userLogin",
+                            userLogin));
+
+                }
+            } catch (Exception exception) {
+                exception.printStackTrace();
             }
-        }
+        });
     }
 
-    private static Map<String,Object> parseProductAttribute(XMLStreamReader reader) {
-        Map<String,Object> productAttributesData = new HashMap<>();
+    // Parse the Product Attributes
+    private static Map<String, Object> parseProductAttribute(XMLStreamReader reader) {
+        Map<String, Object> productAttributesData = new HashMap<>();
         try {
             String attributeId = reader.getAttributeValue(null, "AttributeID");
             String attributeLanguageCode = reader.getAttributeValue(null, "LanguageCode");
@@ -426,127 +547,144 @@ public class parseXml {
             String attributeRecordNum = reader.getAttributeValue(null, "RecordNumber");
             String attributeText = reader.getElementText();
 
-            productAttributesData.put("attributeId",attributeId);
-            productAttributesData.put("attributeText",attributeText);
+            productAttributesData.put("attributeId", attributeId);
+            productAttributesData.put("attributeText", attributeText);
         } catch (XMLStreamException exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         } catch (Exception exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         }
         return productAttributesData;
     }
 
-    private static void processProductsAttributes(List<Map<String,Object>> productAttributesData,String partNumber){
-        for(Map<String,Object> productAttributeData : productAttributesData){
-            Object attributeId = productAttributeData.get("attributeId");
-            Object attributeText = productAttributeData.get("attributeText");
-            try{
-                GenericValue productAttribute = EntityQuery.use(delegator).from("ProductAttribute")
-                        .where("productId", partNumber, "attrName", attributeId).cache().queryOne();
+    // Process product attributes
+    private static void processProductsAttributes(List<Map<String, Object>> productAttributesData, String partNumber) {
+
+        // Iterate through each product attribute data
+        productAttributesData.stream().forEach(productAttributeData -> {
+            String attributeId = (String) productAttributeData.get("attributeId");
+            String attributeText = (String) productAttributeData.get("attributeText");
+
+            try {
+                GenericValue productAttribute = null;
+                try {
+                    // Query the database to find an existing product attribute
+                    productAttribute = EntityQuery.use(delegator).from("ProductAttribute")
+                            .where("productId", partNumber, "attrName", attributeId).cache().queryOne();
+                } catch (GenericEntityException exception) {
+                    exception.printStackTrace();
+                }
 
                 if (productAttribute == null) {
+                    // If product attribute doesn't exist, create a new one
                     dispatcher.runSync("createProductAttribute", UtilMisc.toMap("productId", partNumber, "attrName",
                             attributeId, "attrValue", attributeText, "userLogin", userLogin));
                 } else {
-
+                    // If product attribute exists, update its value
                     dispatcher.runSync("updateProductAttribute", UtilMisc.toMap("productId", partNumber, "attrName",
                             attributeId, "attrValue", attributeText, "userLogin", userLogin));
                 }
             } catch (Exception exception) {
-                System.out.println(exception);
+                exception.printStackTrace();
             }
-        }
+        });
     }
 
     // Parse the ProductPackage information
-    private static Map<String, Object> parseProductPackage(XMLStreamReader reader) throws XMLStreamException {
-        String packageMaintenanceType = reader.getAttributeValue(null, "MaintenanceType");
-        String packageUom = "";
-        String packagelevelGSTIN = "";
-        String packageQuantitySizes = "";
-        String packageBarCodeCharacters = "";
-        String dimensionUom = "";
-        String height = "";
-        String width = "";
-        String length = "";
-        String weightUom = "";
-        String weight = "";
-        while (reader.hasNext()) {
-            int event = reader.next();
-            if (event == XMLStreamConstants.START_ELEMENT) {
-                String elementName = reader.getLocalName();
-                switch (elementName) {
-                    case "PackageUOM":
-                        packageUom = reader.getElementText();
-                        break;
-                    case "PackageLevelGTIN":
-                        packagelevelGSTIN = reader.getElementText();
-                        break;
-                    case "PackageBarCodeCharacters":
-                        packageBarCodeCharacters = reader.getElementText();
-                        break;
-                    case "QuantityofEaches":
-                        packageQuantitySizes = reader.getElementText();
-                        break;
-                    case "Dimensions":
-                        dimensionUom = reader.getAttributeValue(null, "UOM");
-                        while (reader.hasNext()) {
-                            int dimensionEvent = reader.next();
-                            if (dimensionEvent == XMLStreamConstants.START_ELEMENT) {
-                                String dimensionEleName = reader.getLocalName();
-                                switch (dimensionEleName) {
-                                    case "Height":
-                                        height = reader.getElementText();
-                                        break;
-                                    case "Width":
-                                        width = reader.getElementText();
-                                        break;
-                                    case "Length":
-                                        length = reader.getElementText();
-                                        break;
+    private static Map<String, Object> parseProductPackage(XMLStreamReader reader) {
+        Map<String, Object> packageData = new HashMap<>();
+        try {
+            String packageMaintenanceType = reader.getAttributeValue(null, "MaintenanceType");
+            String packageUom = "";
+            String packagelevelGSTIN = "";
+            String packageQuantitySizes = "";
+            String packageBarCodeCharacters = "";
+            String dimensionUom = "";
+            String height = "";
+            String width = "";
+            String length = "";
+            String weightUom = "";
+            String weight = "";
+            while (reader.hasNext()) {
+                int event = reader.next();
+                if (event == XMLStreamConstants.START_ELEMENT) {
+                    String elementName = reader.getLocalName();
+                    switch (elementName) {
+                        case "PackageUOM":
+                            packageUom = reader.getElementText();
+                            break;
+                        case "PackageLevelGTIN":
+                            packagelevelGSTIN = reader.getElementText();
+                            break;
+                        case "PackageBarCodeCharacters":
+                            packageBarCodeCharacters = reader.getElementText();
+                            break;
+                        case "QuantityofEaches":
+                            packageQuantitySizes = reader.getElementText();
+                            break;
+                        case "Dimensions":
+                            dimensionUom = reader.getAttributeValue(null, "UOM");
+                            while (reader.hasNext()) {
+                                int dimensionEvent = reader.next();
+                                if (dimensionEvent == XMLStreamConstants.START_ELEMENT) {
+                                    String dimensionEleName = reader.getLocalName();
+                                    switch (dimensionEleName) {
+                                        case "Height":
+                                            height = reader.getElementText();
+                                            break;
+                                        case "Width":
+                                            width = reader.getElementText();
+                                            break;
+                                        case "Length":
+                                            length = reader.getElementText();
+                                            break;
+                                    }
+                                } else if (dimensionEvent == XMLStreamConstants.END_ELEMENT
+                                        && reader.getLocalName().equals("Dimensions")) {
+                                    break;
                                 }
-                            } else if (dimensionEvent == XMLStreamConstants.END_ELEMENT
-                                    && reader.getLocalName().equals("Dimensions")) {
-                                break;
                             }
-                        }
-                        break;
-                    case "Weights":
-                        weightUom = reader.getAttributeValue(null, "UOM");
-                        while (reader.hasNext()) {
-                            int weightEvent = reader.next();
-                            if (weightEvent == XMLStreamConstants.START_ELEMENT) {
-                                String weightElement = reader.getLocalName();
-                                switch (weightElement) {
-                                    case "Weight":
-                                        weight = reader.getElementText();
-                                        break;
+                            break;
+                        case "Weights":
+                            weightUom = reader.getAttributeValue(null, "UOM");
+                            while (reader.hasNext()) {
+                                int weightEvent = reader.next();
+                                if (weightEvent == XMLStreamConstants.START_ELEMENT) {
+                                    String weightElement = reader.getLocalName();
+                                    switch (weightElement) {
+                                        case "Weight":
+                                            weight = reader.getElementText();
+                                            break;
+                                    }
+                                } else if (weightEvent == XMLStreamConstants.END_ELEMENT
+                                        && reader.getLocalName().equals("Weights")) {
+                                    break;
                                 }
-                            } else if (weightEvent == XMLStreamConstants.END_ELEMENT
-                                    && reader.getLocalName().equals("Weights")) {
-                                break;
                             }
-                        }
-                        break;
+                            break;
+                    }
+                } else if (event == XMLStreamConstants.END_ELEMENT && reader.getLocalName().equals("Package")) {
+                    break; // Exit the loop when </Package> is encountered
                 }
-            } else if (event == XMLStreamConstants.END_ELEMENT && reader.getLocalName().equals("Package")) {
-                break; // Exit the loop when </Package> is encountered
             }
+            packageData.put("PackageLevelGSTIN", packagelevelGSTIN);
+            packageData.put("DimensionUom", dimensionUom);
+            packageData.put("Height", height);
+            packageData.put("Width", width);
+            packageData.put("Length", length);
+            packageData.put("WeightUom", weightUom);
+            packageData.put("Weight", weight);
+        } catch(XMLStreamException exception){
+            exception.printStackTrace();
+        } catch (Exception exception){
+            exception.printStackTrace();
         }
-        Map<String, Object> packData = new HashMap<>();
-        packData.put("PackageLevelGSTIN", packagelevelGSTIN);
-        packData.put("DimensionUom", dimensionUom);
-        packData.put("Height", height);
-        packData.put("Width", width);
-        packData.put("Length", length);
-        packData.put("WeightUom", weightUom);
-        packData.put("Weight", weight);
-        return packData;
+        return packageData;
     }
 
-    // Process Product Interchange Data
-    private static Map<String,Object> parseProductPartInterchange(XMLStreamReader reader) {
-        Map<String,Object> productInterChangeData = new HashMap<>();
+    // Parse Product Interchange Data
+    private static Map<String, Object> parseProductPartInterchange(XMLStreamReader reader) {
+        Map<String, Object> productInterChangeData = new HashMap<>();
         try {
             String maintenanceType = reader.getAttributeValue(null, "MaintenanceType");
             String languageCode = reader.getAttributeValue(null, "LanguageCode");
@@ -577,28 +715,31 @@ public class parseXml {
                     break; // Exit the loop when </PartInterchange> is encountered
                 }
             }
-
             productInterChangeData.put("brandAAIAID", brandAAIAID);
-            productInterChangeData.put("brandLabel",brandLabel);
-            productInterChangeData.put("interchangePartNumber",interchangePartNumber);
-            productInterChangeData.put("typeCode",typeCode);
+            productInterChangeData.put("brandLabel", brandLabel);
+            productInterChangeData.put("interchangePartNumber", interchangePartNumber);
+            productInterChangeData.put("typeCode", typeCode);
         } catch (XMLStreamException exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         } catch (Exception exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         }
         return productInterChangeData;
     }
 
-    private static void processProductsPartInterchange(List<Map<String,Object>> productsInterchangeData, String partNumber){
-        for(Map<String,Object> productInterchange : productsInterchangeData){
-            Object languageCode = productInterchange.get("languageCode");
-            Object typeCode = productInterchange.get("typeCode");
+    // Process Product Interchange data
+    private static void processProductsPartInterchange(List<Map<String, Object>> productsInterchangeData, String partNumber) {
+
+        // Iterate through each product interchange data
+        productsInterchangeData.stream().forEach(productInterchange -> {
+            String languageCode = (String) productInterchange.get("languageCode");
+            String typeCode = (String) productInterchange.get("typeCode");
             String interchangePartNumber = (String) productInterchange.get("interchangePartNumber");
-            Object brandAAIAID = productInterchange.get("brandAAIAID");
-            Object brandLabel = productInterchange.get("brandLabel");
-            try{
-                // Interchange products data
+            String brandAAIAID = (String) productInterchange.get("brandAAIAID");
+            String brandLabel = (String) productInterchange.get("brandLabel");
+
+            try {
+                // Create product parts data for interchange part
                 Map<String, Object> productPartsData = new HashMap<>();
                 if (!brandLabel.equals("")) {
                     productPartsData.put("brandName", brandLabel);
@@ -608,65 +749,85 @@ public class parseXml {
                 productPartsData.put("internalName", interchangePartNumber);
                 productPartsData.put("userLogin", userLogin);
 
+                // Create product association data
                 Map<String, Object> productAssocData = new HashMap<>();
                 Timestamp currentTimestamp = new Timestamp(System.currentTimeMillis());
+                // Determine the type and association type based on type code
                 String type = "";
-                // check the type code
-                if (typeCode.equals("S")) {
-                    type = "PRODUCT_SUBSTITUTE";
-                    productAssocData.put("productAssocTypeId", "PRODUCT_SUBSTITUTE");
-                } else if (typeCode.equals("O")) {
-                    type = "PRODUCT_OBSOLESCENCE";
-                    productAssocData.put("productAssocTypeId", "PRODUCT_OBSOLESCENCE");
-                } else if (typeCode.equals("U")) {
-                    type = "PRODUCT_UPGRADE";
-                    productAssocData.put("productAssocTypeId", "PRODUCT_UPGRADE");
-                } else {
-                    type = "PRODUCT_COMPONENT";
-                    productAssocData.put("productAssocTypeId", "PRODUCT_COMPONENT");
+                String productAssocTypeId = "";
+                switch (typeCode) {
+                    case "S":
+                        type = "PRODUCT_SUBSTITUTE";
+                        productAssocTypeId = "PRODUCT_SUBSTITUTE";
+                        break;
+                    case "O":
+                        type = "PRODUCT_OBSOLESCENCE";
+                        productAssocTypeId = "PRODUCT_OBSOLESCENCE";
+                        break;
+                    case "U":
+                        type = "PRODUCT_UPGRADE";
+                        productAssocTypeId = "PRODUCT_UPGRADE";
+                        break;
+                    default:
+                        type = "PRODUCT_COMPONENT";
+                        productAssocTypeId = "PRODUCT_COMPONENT";
+                        break;
                 }
-
+                productAssocData.put("productAssocTypeId", productAssocTypeId);
                 productAssocData.put("productId", partNumber);
                 productAssocData.put("productIdTo", interchangePartNumber);
                 productAssocData.put("fromDate", currentTimestamp);
                 productAssocData.put("userLogin", userLogin);
 
-
                 if (!interchangePartNumber.trim().equals("")) {
-                    GenericValue product = EntityQuery.use(delegator).from("Product")
-                            .where("productId", interchangePartNumber).cache().queryOne();
+                    GenericValue product = null;
+                    try {
+                        // Query the database to find if interchange product already exists
+                        product = EntityQuery.use(delegator).from("Product")
+                                .where("productId", interchangePartNumber).cache().queryOne();
+                    } catch (GenericEntityException exception) {
+                        exception.printStackTrace();
+                    }
                     if (product == null) {
-                        // Create a interchange product
+                        // Create a new interchange product
                         dispatcher.runSync("createProduct", productPartsData);
                         if (!brandAAIAID.equals("")) {
-                            dispatcher.runAsync("createProductAttribute", UtilMisc.toMap("productId", interchangePartNumber,
-                                    "attrName", "BRANDAAIAID", "attrValue", brandAAIAID, "userLogin", userLogin));
+                            processBrandAAIAID(interchangePartNumber, brandAAIAID);
                         }
                         // Associate the products
                         dispatcher.runSync("createProductAssoc", productAssocData);
                     } else {
-                        GenericValue productAssoc = EntityQuery.use(delegator).from("ProductAssoc")
-                                .where("productId", partNumber,"productIdTo",interchangePartNumber,"productAssocTypeId",type).cache().queryOne();
-                        if(productAssoc == null) {
-                            // Check product is associated or not
+                        GenericValue productAssoc = null;
+                        try {
+                            // Check if the product association already exists
+                            productAssoc = EntityQuery.use(delegator).from("ProductAssoc")
+                                    .where("productId", partNumber, "productIdTo", interchangePartNumber,
+                                            "productAssocTypeId", type)
+                                    .cache().queryOne();
+                        } catch (GenericEntityException exception) {
+                            exception.printStackTrace();
+                        }
+                        if (productAssoc == null) {
+                            // Create the product association
                             dispatcher.runSync("createProductAssoc", productAssocData);
+                        } else {
+                            // Update the existing product association
+                            dispatcher.runSync("updateProductAssoc",
+                                    UtilMisc.toMap("productId", partNumber, "productIdTo", interchangePartNumber,
+                                            "productAssocTypeId", type, "fromDate", productAssoc.get("fromDate"),
+                                            "userLogin", userLogin));
                         }
-                        else{
-                            dispatcher.runSync("updateProductAssoc",UtilMisc.toMap("productId",partNumber,"productIdTo",interchangePartNumber,"productAssocTypeId",type,"fromDate",productAssoc.get("fromDate"),"userLogin",userLogin));
-                        }
-
                     }
                 }
             } catch (Exception exception) {
-                System.out.println(exception);
+                exception.printStackTrace();
             }
-
-        }
+        });
     }
 
-    // Process Product DigitalFileInformation
-    private static Map<String,Object> parseProductDigitalInformation(XMLStreamReader reader) {
-        Map<String,Object> productDigitalInformationsData = new HashMap<>();
+    // Parse Product DigitalFileInformation
+    private static Map<String, Object> parseProductDigitalInformation(XMLStreamReader reader) {
+        Map<String, Object> productDigitalInformationsData = new HashMap<>();
         try {
             String maintenanceType = reader.getAttributeValue(null, "MaintenanceType");
             String languageCode = reader.getAttributeValue(null, "LanguageCode");
@@ -750,141 +911,153 @@ public class parseXml {
                 }
             }
 
-            productDigitalInformationsData.put("languageCode",languageCode);
-            productDigitalInformationsData.put("assetType",assetType);
-            productDigitalInformationsData.put("fileName",fileName);
-            productDigitalInformationsData.put("fileSize",fileSize);
-            productDigitalInformationsData.put("resolution",resolution);
-            productDigitalInformationsData.put("fileType",fileType);
-            productDigitalInformationsData.put("assetId",assetId);
-            productDigitalInformationsData.put("assetDimensionsUom",assetDimensionsUom);
-            productDigitalInformationsData.put("assetHeight",assetHeight);
-            productDigitalInformationsData.put("assetWidth",assetWidth);
-            productDigitalInformationsData.put("filePath",filePath);
-            productDigitalInformationsData.put("colorMode",colorMode);
-            productDigitalInformationsData.put("background",background);
-            productDigitalInformationsData.put("representation",representation);
-            productDigitalInformationsData.put("URI",URI);
+            productDigitalInformationsData.put("languageCode", languageCode);
+            productDigitalInformationsData.put("assetType", assetType);
+            productDigitalInformationsData.put("fileName", fileName);
+            productDigitalInformationsData.put("fileSize", fileSize);
+            productDigitalInformationsData.put("resolution", resolution);
+            productDigitalInformationsData.put("fileType", fileType);
+            productDigitalInformationsData.put("assetId", assetId);
+            productDigitalInformationsData.put("assetDimensionsUom", assetDimensionsUom);
+            productDigitalInformationsData.put("assetHeight", assetHeight);
+            productDigitalInformationsData.put("assetWidth", assetWidth);
+            productDigitalInformationsData.put("filePath", filePath);
+            productDigitalInformationsData.put("colorMode", colorMode);
+            productDigitalInformationsData.put("background", background);
+            productDigitalInformationsData.put("representation", representation);
+            productDigitalInformationsData.put("URI", URI);
         } catch (XMLStreamException exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         } catch (Exception exception) {
-            System.out.println(exception);
+            exception.printStackTrace();
         }
         return productDigitalInformationsData;
     }
 
-    private static void processProductsDigitalInformations(List<Map<String,Object>> digitalAssetsData, String partsNumber){
-        for(Map<String,Object> digitalAssetData : digitalAssetsData){
+    // Process Product Digital Information
+    private static void processProductsDigitalInformations(List<Map<String, Object>> digitalAssetsData, String partsNumber) {
+
+        // Iterate through each digital asset data
+        digitalAssetsData.stream().forEach(digitalAssetData -> {
             String languageCode = (String) digitalAssetData.get("languageCode");
-            Object assetType = digitalAssetData.get("assetType");
-            Object fileName = digitalAssetData.get("fileName");
-            Object resolution = digitalAssetData.get("resolution");
-            Object fileSize = digitalAssetData.get("fileSize");
-            Object fileType = digitalAssetData.get("fileType");
-            Object assetId = digitalAssetData.get("assetId");
-            Object assetDimensionsUom = digitalAssetData.get("assetDimensionsUom");
-            Object assetHeight = digitalAssetData.get("assetHeight");
-            Object assetWidth = digitalAssetData.get("assetWidth");
-            Object filePath = digitalAssetData.get("filePath");
-            Object colorMode = digitalAssetData.get("colorMode");
-            Object background = digitalAssetData.get("background");
-            Object representation = digitalAssetData.get("representation");
-            Object URI = digitalAssetData.get("URI");
+            String assetType = (String) digitalAssetData.get("assetType");
+            String fileName = (String) digitalAssetData.get("fileName");
+            String resolution = (String) digitalAssetData.get("resolution");
+            String fileSize = (String) digitalAssetData.get("fileSize");
+            String fileType = (String) digitalAssetData.get("fileType");
+            String assetId = (String) digitalAssetData.get("assetId");
+            String assetDimensionsUom = (String) digitalAssetData.get("assetDimensionsUom");
+            String assetHeight = (String) digitalAssetData.get("assetHeight");
+            String assetWidth = (String) digitalAssetData.get("assetWidth");
+            String filePath = (String) digitalAssetData.get("filePath");
+            String colorMode = (String) digitalAssetData.get("colorMode");
+            String background = (String) digitalAssetData.get("background");
+            String representation = (String) digitalAssetData.get("representation");
+            String URI = (String) digitalAssetData.get("URI");
+            Map<String, Object> dataResourceData = new HashMap<>();
+            Map<String, Object> contentData = new HashMap<>();
 
-            try{
-
-                Map<String, Object> dataResourceData = new HashMap<>();
-                Map<String, Object> contentData = new HashMap<>();
-                String contentType = "";
-                boolean digitalAssetIsPresent = false;
-
-                //check the file type for Product Content type
-                if (fileType.equals("JPG")) {
-                    contentType = "DETAIL_IMAGE_URL";
-                } else {
-                    contentType = "DIGITAL_DOWNLOAD";
-                }
-
-                //Entity condition for find the contentId's associate with product
+            // Determine content type based on file type
+            String contentType = fileType.equals("JPG") ? "DETAIL_IMAGE_URL" : "DIGITAL_DOWNLOAD";
+            try {
+                // Entity condition to find contentId associated with the product
                 EntityCondition condition = EntityCondition.makeCondition(
                         EntityOperator.AND,
                         EntityCondition.makeCondition("productId", partsNumber),
                         EntityCondition.makeCondition("productContentTypeId", contentType));
 
-                // fetch all the productContent using productId and productContentTypeId
-                List<GenericValue> productContents = EntityQuery.use(delegator).from("ProductContent").where(condition)
-                        .cache().queryList();
-
-                //Search the contentId using fileName
-                for (GenericValue productContent : productContents) {
-                    Object contentId = productContent.get("contentId");
-                    GenericValue content = EntityQuery.use(delegator).from("Content")
-                            .where("contentId", contentId, "contentName", fileName).cache().queryOne();
-
-                    //update the digital File Information
-                    if (content != null) {
-                        if(!assetType.equals("")) {
-                            dispatcher.runSync("updateContent", UtilMisc.toMap("contentId", content.get("contentId"), "description",assetType,"userLogin",userLogin));
-                        }
-                        Object dataResourceId = content.get("dataResourceId");
-                        if (URI.equals("")) {
-                            dispatcher.runSync("updateDataResource", UtilMisc.toMap("dataResourceId", dataResourceId,
-                                    "objectInfo", URI, "userLogin", userLogin));
-                        }
-
-                        // check the assets resolution is present or not
-                        if (!resolution.equals("")) {
-                            dispatcher.runSync("updateDataResourceAttribute",
-                                    UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Resolution", "attrValue",
-                                            resolution, "userLogin", userLogin));
-                        }
-
-                        // check the assets colorMode is present or not
-                        if (!colorMode.equals("")) {
-                            dispatcher.runSync("updateDataResourceAttribute",
-                                    UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "ColorMode", "attrValue",
-                                            colorMode, "userLogin", userLogin));
-                        }
-
-                        if (!representation.equals("")) {
-                            dispatcher.runSync("updateDataResourceAttribute",
-                                    UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Representation",
-                                            "attrValue", representation, "userLogin", userLogin));
-                        }
-
-                        if (!background.equals("")) {
-                            dispatcher.runSync("updateDataResourceAttribute",
-                                    UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Background", "attrValue",
-                                            background, "userLogin", userLogin));
-                        }
-                        if (!fileSize.equals("")) {
-                            dispatcher.runSync("updateDataResourceAttribute", UtilMisc.toMap("dataResourceId",
-                                    dataResourceId, "attrName", "FileSize", "attrValue", fileSize, "userLogin", userLogin));
-                        }
-
-                        if (!assetHeight.equals("")) {
-                            dispatcher.runSync("updateDataResourceAttribute",
-                                    UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetHeight", "attrValue",
-                                            assetHeight, "description", assetDimensionsUom, "userLogin", userLogin));
-                        }
-
-                        if (!assetWidth.equals("")) {
-                            dispatcher.runSync("updateDataResourceAttribute",
-                                    UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetWidth", "attrValue",
-                                            assetWidth, "description", assetDimensionsUom, "userLogin", userLogin));
-                        }
-
-                        digitalAssetIsPresent = true;
-                        break;
+                List<GenericValue> productContents = null;
+                try {
+                    // Query for product contents based on the condition
+                    productContents = EntityQuery.use(delegator)
+                            .from("ProductContent")
+                            .where(condition)
+                            .cache()
+                            .queryList();
+                } catch (GenericEntityException exception) {
+                    exception.printStackTrace();
+                }
+                GenericValue digitalContent = null;
+                if (productContents != null) {
+                    try {
+                        // Find the appropriate digital content by filtering and mapping
+                        digitalContent = productContents.stream()
+                                .map(productContent -> productContent.get("contentId"))
+                                .map(contentId -> {
+                                    GenericValue content = null;
+                                    try {
+                                        // Query the database for content information
+                                        content = EntityQuery.use(delegator)
+                                                .from("Content")
+                                                .where("contentId", contentId, "contentName", fileName)
+                                                .cache()
+                                                .queryOne();
+                                    } catch (GenericEntityException e) {
+                                        e.printStackTrace();
+                                    }
+                                    return content;
+                                })
+                                .filter(Objects::nonNull)
+                                .findFirst()
+                                .orElse(null);
+                    } catch (Exception exception) {
+                        exception.printStackTrace();
                     }
                 }
-
-                //create the digital file information
-                if (!digitalAssetIsPresent) {
+                if (digitalContent != null) {
+                    // Update existing digital content and associated attributes
+                    if (!assetType.equals("")) {
+                        dispatcher.runSync("updateContent", UtilMisc.toMap("contentId", digitalContent.get("contentId"),
+                                "description", assetType, "userLogin", userLogin));
+                    }
+                    Object dataResourceId = digitalContent.get("dataResourceId");
+                    if (!URI.equals("")) {
+                        dispatcher.runSync("updateDataResource", UtilMisc.toMap("dataResourceId", dataResourceId,
+                                "objectInfo", URI, "userLogin", userLogin));
+                    }
+                    if (!resolution.equals("")) {
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Resolution",
+                                        "attrValue", resolution, "userLogin", userLogin));
+                    }
+                    if (!colorMode.equals("")) {
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "ColorMode",
+                                        "attrValue", colorMode, "userLogin", userLogin));
+                    }
+                    // Update additional attributes
+                    if (!representation.equals("")) {
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Representation",
+                                        "attrValue", representation, "userLogin", userLogin));
+                    }
+                    if (!background.equals("")) {
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "Background",
+                                        "attrValue", background, "userLogin", userLogin));
+                    }
+                    if (!fileSize.equals("")) {
+                        dispatcher.runSync("updateDataResourceAttribute", UtilMisc.toMap("dataResourceId",
+                                dataResourceId, "attrName", "FileSize", "attrValue", fileSize, "userLogin",
+                                userLogin));
+                    }
+                    if (!assetHeight.equals("")) {
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetHeight",
+                                        "attrValue", assetHeight, "description", assetDimensionsUom,
+                                        "userLogin", userLogin));
+                    }
+                    if (!assetWidth.equals("")) {
+                        dispatcher.runSync("updateDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetWidth",
+                                        "attrValue", assetWidth, "description", assetDimensionsUom,
+                                        "userLogin", userLogin));
+                    }
+                } else {
+                    // Create new data resource
                     if (!URI.equals("")) {
                         dataResourceData.put("objectInfo", URI);
                     }
-
                     if (!fileType.equals("JPG")) {
                         dataResourceData.put("mimeTypeId", "image/jpeg");
                     } else if (!fileType.equals("MP4")) {
@@ -892,50 +1065,53 @@ public class parseXml {
                     } else {
                         dataResourceData.put("mimeTypeId", "application/pdf");
                     }
-
                     dataResourceData.put("userLogin", userLogin);
-
                     Map<String, Object> dataResource = dispatcher.runSync("createDataResource", dataResourceData);
                     Object dataResourceId = dataResource.get("dataResourceId");
-
-                    // check the assets resolution is present or not
+                    // Create data resource attributes
                     if (!resolution.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId,
-                                "attrName", "Resolution", "attrValue", resolution, "userLogin", userLogin));
+                        dispatcher.runSync("createDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId,
+                                        "attrName", "Resolution", "attrValue", resolution,
+                                        "userLogin", userLogin));
                     }
-
-                    // check the assets colorMode is present or not
                     if (!colorMode.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId,
-                                "attrName", "ColorMode", "attrValue", colorMode, "userLogin", userLogin));
+                        dispatcher.runSync("createDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId,
+                                        "attrName", "ColorMode", "attrValue", colorMode,
+                                        "userLogin", userLogin));
                     }
-
                     if (!representation.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId,
-                                "attrName", "Representation", "attrValue", representation, "userLogin", userLogin));
+                        dispatcher.runSync("createDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId,
+                                        "attrName", "Representation", "attrValue", representation,
+                                        "userLogin", userLogin));
                     }
-
                     if (!background.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId,
-                                "attrName", "Background", "attrValue", background, "userLogin", userLogin));
+                        dispatcher.runSync("createDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId,
+                                        "attrName", "Background", "attrValue", background,
+                                        "userLogin", userLogin));
                     }
                     if (!fileSize.equals("")) {
-                        dispatcher.runSync("createDataResourceAttribute", UtilMisc.toMap("dataResourceId", dataResourceId,
-                                "attrName", "FileSize", "attrValue", fileSize, "userLogin", userLogin));
+                        dispatcher.runSync("createDataResourceAttribute",
+                                UtilMisc.toMap("dataResourceId", dataResourceId,
+                                        "attrName", "FileSize", "attrValue", fileSize,
+                                        "userLogin", userLogin));
                     }
-
                     if (!assetHeight.equals("")) {
                         dispatcher.runSync("createDataResourceAttribute",
-                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetHeight", "attrValue",
-                                        assetHeight, "description", assetDimensionsUom, "userLogin", userLogin));
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetHeight",
+                                        "attrValue", assetHeight, "description", assetDimensionsUom,
+                                        "userLogin", userLogin));
                     }
-
                     if (!assetWidth.equals("")) {
                         dispatcher.runSync("createDataResourceAttribute",
-                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetWidth", "attrValue",
-                                        assetWidth, "description", assetDimensionsUom, "userLogin", userLogin));
+                                UtilMisc.toMap("dataResourceId", dataResourceId, "attrName", "AssetWidth",
+                                        "attrValue", assetWidth, "description", assetDimensionsUom,
+                                        "userLogin", userLogin));
                     }
-
+                    // Create content data
                     if (languageCode != null && !languageCode.isEmpty()) {
                         contentData.put("localeString", languageCode);
                     }
@@ -945,27 +1121,26 @@ public class parseXml {
                     if (!fileName.equals("")) {
                         contentData.put("contentName", fileName);
                     }
-
                     contentData.put("dataResourceId", dataResourceId);
                     contentData.put("userLogin", userLogin);
-
                     Map<String, Object> contentResult = dispatcher.runSync("createContent", contentData);
                     Object contentId = contentResult.get("contentId");
-
-                    // Create the ProductContent using partNumber and ContentId
-                    if (!partsNumber.equals("")) {
-                        if (fileType.equals("JPG")) {
-                            dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId",
-                                    contentId, "productContentTypeId", "DETAIL_IMAGE_URL", "userLogin", userLogin));
-                        } else {
-                            dispatcher.runSync("createProductContent", UtilMisc.toMap("productId", partsNumber, "contentId",
-                                    contentId, "productContentTypeId", "DIGITAL_DOWNLOAD", "userLogin", userLogin));
-                        }
+                    // Determine product content type and create product content
+                    if (fileType.equals("JPG")) {
+                        dispatcher.runSync("createProductContent",
+                                UtilMisc.toMap("productId", partsNumber, "contentId",
+                                        contentId, "productContentTypeId", "DETAIL_IMAGE_URL", "userLogin",
+                                        userLogin));
+                    } else {
+                        dispatcher.runSync("createProductContent",
+                                UtilMisc.toMap("productId", partsNumber, "contentId",
+                                        contentId, "productContentTypeId", "DIGITAL_DOWNLOAD", "userLogin",
+                                        userLogin));
                     }
                 }
-            }  catch (Exception exception) {
-                System.out.println(exception);
+            } catch (Exception exception) {
+                exception.printStackTrace();
             }
-        }
+        });
     }
 }
