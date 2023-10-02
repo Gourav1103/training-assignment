@@ -1,7 +1,4 @@
 //Imports neccessary packages
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -16,13 +13,11 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
 import org.apache.ofbiz.service.ServiceUtil;
-import org.apache.ofbiz.base.util.Debug;
 import org.apache.ofbiz.base.util.UtilMisc;
 import org.apache.ofbiz.entity.Delegator;
 import org.apache.ofbiz.entity.GenericEntityException;
 import org.apache.ofbiz.entity.GenericValue;
 import org.apache.ofbiz.service.DispatchContext;
-import org.apache.ofbiz.service.ServiceUtil;
 import org.apache.ofbiz.base.util.Debug;
 import org.apache.ofbiz.service.LocalDispatcher;
 import org.apache.ofbiz.base.util.UtilDateTime;
@@ -35,21 +30,17 @@ import org.apache.ofbiz.entity.condition.EntityCondition;
 import org.apache.ofbiz.entity.condition.EntityOperator;
 import java.util.Objects;
 
-public class parseXml {
+public class ParseXml {
 
     private static final String FILENAME = "C:\\Users\\91999\\OffBiz\\ofbiz-framework\\plugins\\importPies\\src\\main\\parse.xml";
-    private static LocalDispatcher dispatcher;
-    private static Delegator delegator;
-    private static GenericValue userLogin;
-
     public static Map<String, Object> processXmlData(DispatchContext dctx, Map<String, ? extends Object> context) {
         Map<String, Object> result = ServiceUtil.returnSuccess();
-        dispatcher = dctx.getDispatcher();
-        delegator = dctx.getDelegator();
-        userLogin = (GenericValue) context.get("userLogin"); // get UserLogin from Context
+        LocalDispatcher dispatcher = dctx.getDispatcher();
+        Delegator delegator = dctx.getDelegator();
+        GenericValue userLogin = (GenericValue) context.get("userLogin"); // get UserLogin from Context
         try {
             // call the parsing function
-            printXmlByXmlCursorReader();
+            printXmlByXmlCursorReader(dctx,userLogin);
             return result;
         } catch (Exception exception) {
             exception.printStackTrace();
@@ -58,7 +49,7 @@ public class parseXml {
     }
 
     // parsing xml data
-    private static void printXmlByXmlCursorReader() {
+    private static void printXmlByXmlCursorReader(DispatchContext dctx,GenericValue userLogin) {
         try {
             XMLInputFactory factory = XMLInputFactory.newInstance();
             Path filePath = Paths.get(FILENAME);
@@ -70,11 +61,10 @@ public class parseXml {
                 if (itemEvent == XMLStreamConstants.START_ELEMENT) {
                     String currentElement = reader.getLocalName();
                     if ("Item".equals(currentElement)) {
-                        processItemElement(reader); // Process the Item data (each product)
+                        processItemElement(reader,dctx,userLogin); // Process the Item data (each product)
                     }
                 }
             }
-
             reader.close();// close the reader
             fileInputStream.close();
         } catch (XMLStreamException exception) {
@@ -87,7 +77,7 @@ public class parseXml {
     }
 
     // Process Each Item
-    private static void processItemElement(XMLStreamReader reader) {
+    private static void processItemElement(XMLStreamReader reader,DispatchContext dctx,GenericValue userLogin) {
         try {
             String maintenanceType = reader.getAttributeValue(null, "MaintenanceType");
             String partNumber = "";
@@ -105,6 +95,7 @@ public class parseXml {
             String minimumOrderQuantity = "";
             String AAIAProductCategoryCode = "";
             String partTerminologyID = "";
+            LocalDispatcher dispatcher = dctx.getDispatcher();
             Map<String, Object> packageData = new HashMap<>();
             List<Map<String, Object>> descriptionsData = new ArrayList<>();
             List<Map<String, Object>> digitalAssetsInformation = new ArrayList<>();
@@ -217,17 +208,17 @@ public class parseXml {
             }
 
             // process Product Data
-            processProductInformation(productData);
+            processProductInformation(productData,dctx,userLogin);
 
             // process BrandAAIAID
-            processBrandAAIAID(partNumber, brandAAIAID);
+            processBrandAAIAID(partNumber, brandAAIAID,dctx,userLogin);
 
             // process GTINCODE for Item
-            processGoodIdentification(partNumber, itemLevelGTIN, "UPCA");
+            processGoodIdentification(partNumber, itemLevelGTIN, "UPCA",dctx,userLogin);
 
             // process GTINCODE for Package
             String packageGTINCode = (String) packageData.get("PackageLevelGSTIN");
-            processGoodIdentification(partNumber, packageGTINCode, "GTIN-14");
+            processGoodIdentification(partNumber, packageGTINCode, "GTIN-14",dctx,userLogin);
 
             if (hazardousMaterialCode.equals("Y")) {
                 Map<String, Object> productFeatureData = dispatcher.runSync("createProductFeature", UtilMisc.toMap(
@@ -239,19 +230,19 @@ public class parseXml {
             }
 
             // process Descriptions
-            processDescriptions(descriptionsData, partNumber);
+            processDescriptions(descriptionsData, partNumber, dctx, userLogin);
 
             // process Extended Informations
-            processExtendedInformations(extendedInformationData, partNumber);
+            processExtendedInformations(extendedInformationData, partNumber,dctx,userLogin);
 
             // process Product Attributes
-            processProductsAttributes(productAttributesData, partNumber);
+            processProductsAttributes(productAttributesData, partNumber,dctx,userLogin);
 
             // process partInterChangeData
-            processProductsPartInterchange(partInterchangeData, partNumber);
+            processProductsPartInterchange(partInterchangeData, partNumber,dctx,userLogin);
 
             // process products Digital Assets Informations
-            processProductsDigitalInformations(digitalAssetsInformation, partNumber);
+            processProductsDigitalInformations(digitalAssetsInformation, partNumber,dctx,userLogin);
 
         } catch (XMLStreamException exception) {
             exception.printStackTrace();
@@ -261,8 +252,10 @@ public class parseXml {
     }
 
     // Process Product Information
-    private static void processProductInformation(Map<String, Object> productData) {
+    private static void processProductInformation(Map<String, Object> productData, DispatchContext dctx,GenericValue userLogin) {
         try {
+            LocalDispatcher dispatcher = dctx.getDispatcher();
+            Delegator delegator = dctx.getDelegator();
             GenericValue product = null;
             try {
                 // Query the database for the product using productId
@@ -284,8 +277,10 @@ public class parseXml {
     }
 
     // Process Brand AAIAID
-    private static void processBrandAAIAID(String partNumber, String brandValue) {
+    private static void processBrandAAIAID(String partNumber, String brandValue, DispatchContext dctx,GenericValue userLogin) {
         try {
+            LocalDispatcher dispatcher = dctx.getDispatcher();
+            Delegator delegator = dctx.getDelegator();
             GenericValue productAttribute = null;
             try {
                 // Query the database for a product attribute named "BrandAAIAID" with the given
@@ -307,8 +302,10 @@ public class parseXml {
     }
 
     // Process Good Identification
-    private static void processGoodIdentification(String partNumber, String GTINCode, String GTINType) {
+    private static void processGoodIdentification(String partNumber, String GTINCode, String GTINType, DispatchContext dctx,GenericValue userLogin) {
         try {
+            LocalDispatcher dispatcher = dctx.getDispatcher();
+            Delegator delegator = dctx.getDelegator();
             GenericValue goodIdentificationForItem = null;
             try {
                 // Query the database for a good identification with the given GTIN code and
@@ -354,9 +351,11 @@ public class parseXml {
     }
 
     // Process Description
-    private static void processDescriptions(List<Map<String, Object>> descriptionsData, String partsNumber) {
+    private static void processDescriptions(List<Map<String, Object>> descriptionsData, String partsNumber, DispatchContext dctx,GenericValue userLogin) {
         // Iterate through each description data
         descriptionsData.stream().forEach(descriptionData -> {
+            LocalDispatcher dispatcher = dctx.getDispatcher();
+            Delegator delegator = dctx.getDelegator();
             String descriptionCode = (String) descriptionData.get("descriptionCode");
             String languageCode = (String) descriptionData.get("languageCode");
             String descriptionText = (String) descriptionData.get("descriptionText");
@@ -366,51 +365,24 @@ public class parseXml {
                 EntityCondition condition = EntityCondition.makeCondition(
                         EntityOperator.AND,
                         EntityCondition.makeCondition("productId", partsNumber),
-                        EntityCondition.makeCondition("productContentTypeId", "LONG_DESCRIPTION"));
+                        EntityCondition.makeCondition("productContentTypeId", "LONG_DESCRIPTION"),
+                        EntityCondition.makeCondition("contentName", descriptionCode));
 
-                List<GenericValue> productContents = null;
+                GenericValue dataResourceAndContent = null;
                 try {
                     // Query the database for matching product contents
-                    productContents = EntityQuery.use(delegator)
-                            .from("ProductContent")
+                    dataResourceAndContent = EntityQuery.use(delegator)
+                            .from("ProductContentAndInfo")
                             .where(condition)
                             .cache()
-                            .queryList();
+                            .queryOne();
                 } catch (GenericEntityException exception) {
                     exception.printStackTrace();
                 }
 
-                GenericValue descriptionContent = null;
-                if (productContents != null) {
-                    try {
-                        // Find the appropriate description content by filtering and mapping
-                        descriptionContent = productContents.stream()
-                                .map(productContent -> productContent.get("contentId"))
-                                .map(contentId -> {
-                                    GenericValue content = null;
-                                    try {
-                                        // Query the database for content information
-                                        content = EntityQuery.use(delegator)
-                                                .from("Content")
-                                                .where("contentId", contentId, "contentName", descriptionCode)
-                                                .cache()
-                                                .queryOne();
-                                    } catch (GenericEntityException exception) {
-                                        exception.printStackTrace();
-                                    }
-                                    return content;
-                                })
-                                .filter(Objects::nonNull)
-                                .findFirst()
-                                .orElse(null);
-                    } catch (Exception exception) {
-                        exception.printStackTrace();
-                    }
-                }
-
-                if (descriptionContent != null) {
+                if (dataResourceAndContent != null) {
                     // If description content exists, update it with new text data
-                    Object dataResourceId = descriptionContent.get("dataResourceId");
+                    Object dataResourceId = dataResourceAndContent.get("dataResourceId");
                     dispatcher.runSync("updateElectronicText", UtilMisc.toMap("dataResourceId", dataResourceId,
                             "textData", descriptionText, "userLogin", userLogin));
 
@@ -460,10 +432,12 @@ public class parseXml {
     }
 
     // Process Extended Information
-    private static void processExtendedInformations(List<Map<String, Object>> extendedInformationData, String partsNumber) {
+    private static void processExtendedInformations(List<Map<String, Object>> extendedInformationData, String partsNumber,DispatchContext dctx,GenericValue userLogin) {
 
         // Iterate through each extended information data
         extendedInformationData.stream().forEach(extendedInformation -> {
+            LocalDispatcher dispatcher = dctx.getDispatcher();
+            Delegator delegator = dctx.getDelegator();
             String expiCode = (String) extendedInformation.get("expiCode");
             String extendedLanguageCode = (String) extendedInformation.get("extendedLanguageCode");
             String extendedInfoText = (String) extendedInformation.get("extendedInfoText");
@@ -558,10 +532,12 @@ public class parseXml {
     }
 
     // Process product attributes
-    private static void processProductsAttributes(List<Map<String, Object>> productAttributesData, String partNumber) {
+    private static void processProductsAttributes(List<Map<String, Object>> productAttributesData, String partNumber, DispatchContext dctx,GenericValue userLogin) {
 
         // Iterate through each product attribute data
         productAttributesData.stream().forEach(productAttributeData -> {
+            LocalDispatcher dispatcher = dctx.getDispatcher();
+            Delegator delegator = dctx.getDelegator();
             String attributeId = (String) productAttributeData.get("attributeId");
             String attributeText = (String) productAttributeData.get("attributeText");
 
@@ -728,10 +704,12 @@ public class parseXml {
     }
 
     // Process Product Interchange data
-    private static void processProductsPartInterchange(List<Map<String, Object>> productsInterchangeData, String partNumber) {
+    private static void processProductsPartInterchange(List<Map<String, Object>> productsInterchangeData, String partNumber, DispatchContext dctx,GenericValue userLogin) {
 
         // Iterate through each product interchange data
         productsInterchangeData.stream().forEach(productInterchange -> {
+            LocalDispatcher dispatcher = dctx.getDispatcher();
+            Delegator delegator = dctx.getDelegator();
             String languageCode = (String) productInterchange.get("languageCode");
             String typeCode = (String) productInterchange.get("typeCode");
             String interchangePartNumber = (String) productInterchange.get("interchangePartNumber");
@@ -792,7 +770,7 @@ public class parseXml {
                         // Create a new interchange product
                         dispatcher.runSync("createProduct", productPartsData);
                         if (!brandAAIAID.equals("")) {
-                            processBrandAAIAID(interchangePartNumber, brandAAIAID);
+                            processBrandAAIAID(interchangePartNumber, brandAAIAID,dctx,userLogin);
                         }
                         // Associate the products
                         dispatcher.runSync("createProductAssoc", productAssocData);
@@ -935,10 +913,12 @@ public class parseXml {
     }
 
     // Process Product Digital Information
-    private static void processProductsDigitalInformations(List<Map<String, Object>> digitalAssetsData, String partsNumber) {
+    private static void processProductsDigitalInformations(List<Map<String, Object>> digitalAssetsData, String partsNumber, DispatchContext dctx,GenericValue userLogin) {
 
         // Iterate through each digital asset data
         digitalAssetsData.stream().forEach(digitalAssetData -> {
+            LocalDispatcher dispatcher = dctx.getDispatcher();
+            Delegator delegator = dctx.getDelegator();
             String languageCode = (String) digitalAssetData.get("languageCode");
             String assetType = (String) digitalAssetData.get("assetType");
             String fileName = (String) digitalAssetData.get("fileName");
@@ -964,53 +944,28 @@ public class parseXml {
                 EntityCondition condition = EntityCondition.makeCondition(
                         EntityOperator.AND,
                         EntityCondition.makeCondition("productId", partsNumber),
-                        EntityCondition.makeCondition("productContentTypeId", contentType));
+                        EntityCondition.makeCondition("productContentTypeId", contentType),
+                        EntityCondition.makeCondition("contentName", fileName));
 
-                List<GenericValue> productContents = null;
+                GenericValue productContent = null;
                 try {
-                    // Query for product contents based on the condition
-                    productContents = EntityQuery.use(delegator)
-                            .from("ProductContent")
+                    // Query for product content, Content, DataResource  based on the condition
+                    productContent = EntityQuery.use(delegator)
+                            .from("ProductContentAndInfo")
                             .where(condition)
                             .cache()
-                            .queryList();
+                            .queryOne();
                 } catch (GenericEntityException exception) {
                     exception.printStackTrace();
                 }
-                GenericValue digitalContent = null;
-                if (productContents != null) {
-                    try {
-                        // Find the appropriate digital content by filtering and mapping
-                        digitalContent = productContents.stream()
-                                .map(productContent -> productContent.get("contentId"))
-                                .map(contentId -> {
-                                    GenericValue content = null;
-                                    try {
-                                        // Query the database for content information
-                                        content = EntityQuery.use(delegator)
-                                                .from("Content")
-                                                .where("contentId", contentId, "contentName", fileName)
-                                                .cache()
-                                                .queryOne();
-                                    } catch (GenericEntityException e) {
-                                        e.printStackTrace();
-                                    }
-                                    return content;
-                                })
-                                .filter(Objects::nonNull)
-                                .findFirst()
-                                .orElse(null);
-                    } catch (Exception exception) {
-                        exception.printStackTrace();
-                    }
-                }
-                if (digitalContent != null) {
+
+                if (productContent != null) {
                     // Update existing digital content and associated attributes
                     if (!assetType.equals("")) {
-                        dispatcher.runSync("updateContent", UtilMisc.toMap("contentId", digitalContent.get("contentId"),
+                        dispatcher.runSync("updateContent", UtilMisc.toMap("contentId", productContent.get("contentId"),
                                 "description", assetType, "userLogin", userLogin));
                     }
-                    Object dataResourceId = digitalContent.get("dataResourceId");
+                    Object dataResourceId = productContent.get("dataResourceId");
                     if (!URI.equals("")) {
                         dispatcher.runSync("updateDataResource", UtilMisc.toMap("dataResourceId", dataResourceId,
                                 "objectInfo", URI, "userLogin", userLogin));
